@@ -198,6 +198,78 @@
     padding:3px 11px;
   }
 
+  /* ---------- おしながき（開閉式のお知らせ） ---------- */
+  .notes{
+    margin:0 0 36px;
+    display:grid;
+    gap:10px;
+  }
+
+  .note{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+    transition:border-color .25s ease;
+  }
+  .note[open]{ border-color:#C6D2C7; }
+
+  .note summary{
+    list-style:none;            /* 既定の▶マークを消す */
+    cursor:pointer;
+    padding:15px 20px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'Shippori Mincho', serif;
+    font-weight:600;
+    font-size:.95rem;
+    letter-spacing:.08em;
+    color:var(--green-d);
+    user-select:none;
+  }
+  .note summary::-webkit-details-marker{ display:none; }
+
+  .note summary:hover{ background:var(--green-s); }
+  .note summary:focus-visible{
+    outline:2px solid var(--green);
+    outline-offset:-2px;
+  }
+
+  /* 開閉の目印（＋が×に回る） */
+  .note summary::after{
+    content:"＋";
+    margin-left:auto;
+    color:var(--green);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:500;
+    transition:transform .3s ease;
+  }
+  .note[open] summary::after{ transform:rotate(45deg); }
+
+  .note summary .hint{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:400;
+    font-size:.72rem;
+    color:var(--grey);
+    letter-spacing:.06em;
+  }
+
+  .note-body{
+    padding:2px 20px 18px;
+    font-size:.88rem;
+    color:var(--ink);
+    line-height:1.9;
+    border-top:1px dashed var(--line);
+    animation:note-open .35s ease;
+  }
+  .note-body p + p{ margin-top:8px; }
+
+  @keyframes note-open{
+    from{ opacity:0; transform:translateY(-4px); }
+    to  { opacity:1; transform:translateY(0); }
+  }
+
   /* ---------- あとがき ---------- */
   footer{
     border-top:1px solid var(--line);
@@ -239,6 +311,25 @@
 </header>
 
 <main class="wrap">
+
+  <!-- ===================================================
+       開閉式のお知らせ欄。
+       増やす時は <details class="note"> … </details> を
+       まるごと複製して、見出しと中身を書き換えるだけです。
+       最初から開いておきたい時は <details class="note" open> に。
+  ==================================================== -->
+  <div class="notes">
+
+    <details class="note">
+      <summary>attention <span class="hint">（タップして読んでね）</span></summary>
+      <div class="note-body">
+        <p>ここにお知らせや注意書きを。タップで開いて、もう一度タップすると閉じます。</p>
+        <p>段落を増やしたい時は、この &lt;p&gt; を複製してください。</p>
+      </div>
+    </details>
+
+  </div>
+
   <p class="section-label">— 展示中 —</p>
 
   <div class="cards">
