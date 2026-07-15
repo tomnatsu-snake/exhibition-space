@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>軽量化室 — 画像圧縮ツール</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --surface: #1e2128;
+    --surface-2: #262a33;
+    --line: #343945;
+    --text: #e7e9ee;
+    --text-dim: #9aa0ad;
+    --accent: #7fb4a2;
+    --accent-dim: #4d7568;
+    --danger: #c98484;
+    --radius: 10px;
+    --mono: "SFMono-Regular", "Consolas", "Menlo", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px 64px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header { margin-bottom: 28px; }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+  }
+  h1 .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    margin-left: 12px;
+  }
+  .privacy-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+  .privacy-note::before {
+    content: "●";
+    color: var(--accent);
+    font-size: 8px;
+    margin-right: 6px;
+    vertical-align: 2px;
+  }
+
+  /* ドロップゾーン */
+  #dropzone {
+    border: 1.5px dashed var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 44px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 24px;
+  }
+  #dropzone:hover, #dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--surface-2);
+  }
+  #dropzone .dz-main { font-size: 15px; }
+  #dropzone .dz-hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  #fileInput { display: none; }
+
+  /* 設定パネル */
+  .settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 640px) {
+    .settings { grid-template-columns: 1fr; }
+  }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+  .field .value {
+    color: var(--accent);
+    font-family: var(--mono);
+    margin-left: 8px;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  select:focus, input[type="number"]:focus, input[type="range"]:focus-visible {
+    outline: 2px solid var(--accent-dim);
+    outline-offset: 1px;
+  }
+  .field-note { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+
+  /* リスト */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    min-height: 36px;
+  }
+  .toolbar .count { font-size: 13px; color: var(--text-dim); }
+  .btn {
+    background: var(--accent-dim);
+    color: var(--text);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--accent); color: #12211c; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+  }
+  .btn.ghost:hover { color: var(--danger); border-color: var(--danger); background: transparent; }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  .card {
+    display: grid;
+    grid-template-columns: 72px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  @media (max-width: 640px) {
+    .card { grid-template-columns: 56px 1fr; }
+    .card .actions { grid-column: 1 / -1; justify-self: end; }
+  }
+  .thumb {
+    width: 72px; height: 72px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: var(--surface-2);
+  }
+  @media (max-width: 640px) { .thumb { width: 56px; height: 56px; } }
+  .meta .name {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 420px;
+  }
+  .meta .sizes {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .meta .sizes .after { color: var(--accent); }
+  .meta .sizes .worse { color: var(--danger); }
+  .meta .dims { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+  /* 削減バー */
+  .bar {
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+    max-width: 320px;
+  }
+  .bar .fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  .actions { display: flex; gap: 8px; }
+  .status { font-size: 12px; color: var(--text-dim); }
+
+  .empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 24px 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>軽量化室<span class="sub">image compressor</span></h1>
+    <p class="privacy-note">処理はすべてこのブラウザ内で完結します。画像はどこにも送信されません。</p>
+  </header>
+
+  <div id="dropzone" role="button" tabindex="0" aria-label="画像を選択またはドロップ">
+    <div class="dz-main">ここに画像をドロップ、またはクリックして選択</div>
+    <div class="dz-hint">JPEG / PNG / WebP / GIF ・ 複数枚OK</div>
+  </div>
+  <input type="file" id="fileInput" accept="image/*" multiple>
+
+  <div class="settings">
+    <div class="field">
+      <label for="quality">品質<span class="value" id="qualityVal">0.8</span></label>
+      <input type="range" id="quality" min="0.1" max="1" step="0.05" value="0.8">
+      <div class="field-note">低いほど軽くなる（PNGでは無効）</div>
+    </div>
+    <div class="field">
+      <label for="maxSize">長辺の最大px</label>
+      <input type="number" id="maxSize" min="100" step="100" placeholder="制限なし">
+      <div class="field-note">空欄なら元のサイズを維持</div>
+    </div>
+    <div class="field">
+      <label for="format">出力形式</label>
+      <select id="format">
+        <option value="image/jpeg">JPEG（写真向き・軽い）</option>
+        <option value="image/webp">WebP（さらに軽いことが多い）</option>
+        <option value="image/png">PNG（無劣化・透過を保持）</option>
+      </select>
+      <div class="field-note">JPEGは透過部分が白になります</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <span class="count" id="count"></span>
+    <div style="display:flex; gap:8px;">
+      <button class="btn ghost" id="clearBtn" style="display:none">すべて消す</button>
+      <button class="btn" id="downloadAll" style="display:none">すべてダウンロード</button>
+    </div>
+  </div>
+
+  <div id="list"><div class="empty">まだ画像がありません</div></div>
+</div>
+
+<script>
+(() => {
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const qualityEl = document.getElementById('quality');
+  const qualityVal = document.getElementById('qualityVal');
+  const maxSizeEl = document.getElementById('maxSize');
+  const formatEl = document.getElementById('format');
+  const listEl = document.getElementById('list');
+  const countEl = document.getElementById('count');
+  const downloadAllBtn = document.getElementById('downloadAll');
+  const clearBtn = document.getElementById('clearBtn');
+
+  let items = []; // { id, file, thumbUrl, blob, outUrl, outName, w, h, ow, oh, status }
+  let idSeq = 0;
+
+  const fmtBytes = b => {
+    if (b < 1024) return b + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1024 / 1024).toFixed(2) + ' MB';
+  };
+
+  const extFor = mime => ({'image/jpeg':'jpg','image/webp':'webp','image/png':'png'}[mime] || 'img');
+
+  qualityEl.addEventListener('input', () => {
+    qualityVal.textContent = qualityEl.value;
+  });
+
+  // 設定変更で全再圧縮（少しディレイ）
+  let reTimer = null;
+  const scheduleRecompress = () => {
+    clearTimeout(reTimer);
+    reTimer = setTimeout(() => items.forEach(compressItem), 350);
+  };
+  qualityEl.addEventListener('change', scheduleRecompress);
+  maxSizeEl.addEventListener('change', scheduleRecompress);
+  formatEl.addEventListener('change', scheduleRecompress);
+
+  // 入力経路
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+
+  ['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e => {
+    e.preventDefault(); dropzone.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+    e.preventDefault(); dropzone.classList.remove('dragover');
+  }));
+  dropzone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+  // ページ全体へのドロップも受ける（誤ドロップでタブが飛ぶのを防ぐ）
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => e.preventDefault());
+
+  function addFiles(fileList) {
+    const files = [...fileList].filter(f => f.type.startsWith('image/'));
+    for (const file of files) {
+      const item = {
+        id: ++idSeq,
+        file,
+        thumbUrl: URL.createObjectURL(file),
+        blob: null, outUrl: null, outName: '',
+        w: 0, h: 0, ow: 0, oh: 0,
+        status: 'pending'
+      };
+      items.push(item);
+      compressItem(item);
+    }
+    render();
+  }
+
+  async function compressItem(item) {
+    item.status = 'working';
+    render();
+    try {
+      const img = await loadImage(item.thumbUrl);
+      item.ow = img.naturalWidth;
+      item.oh = img.naturalHeight;
+
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const max = parseInt(maxSizeEl.value, 10);
+      if (max && Math.max(w, h) > max) {
+        const scale = max / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      const mime = formatEl.value;
+      if (mime === 'image/jpeg') { // 透過→白
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+      }
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const quality = parseFloat(qualityEl.value);
+      const blob = await new Promise(res => canvas.toBlob(res, mime, quality));
+      if (!blob) throw new Error('変換に失敗しました');
+
+      if (item.outUrl) URL.revokeObjectURL(item.outUrl);
+      item.blob = blob;
+      item.outUrl = URL.createObjectURL(blob);
+      const base = item.file.name.replace(/\.[^.]+$/, '');
+      item.outName = base + '-compressed.' + extFor(mime);
+      item.w = w; item.h = h;
+      item.status = 'done';
+    } catch (err) {
+      console.error(err);
+      item.status = 'error';
+    }
+    render();
+  }
+
+  function loadImage(url) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = url;
+    });
+  }
+
+  function removeItem(id) {
+    const item = items.find(i => i.id === id);
+    if (item) {
+      URL.revokeObjectURL(item.thumbUrl);
+      if (item.outUrl) URL.revokeObjectURL(item.outUrl);
+    }
+    items = items.filter(i => i.id !== id);
+    render();
+  }
+
+  clearBtn.addEventListener('click', () => {
+    items.forEach(i => {
+      URL.revokeObjectURL(i.thumbUrl);
+      if (i.outUrl) URL.revokeObjectURL(i.outUrl);
+    });
+    items = [];
+    render();
+  });
+
+  downloadAllBtn.addEventListener('click', async () => {
+    for (const item of items) {
+      if (item.status === 'done') {
+        triggerDownload(item);
+        await new Promise(r => setTimeout(r, 250)); // ブラウザのブロック回避
+      }
+    }
+  });
+
+  function triggerDownload(item) {
+    const a = document.createElement('a');
+    a.href = item.outUrl;
+    a.download = item.outName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function render() {
+    const doneCount = items.filter(i => i.status === 'done').length;
+    countEl.textContent = items.length
+      ? `${items.length} 枚（処理済み ${doneCount}）`
+      : '';
+    downloadAllBtn.style.display = doneCount > 0 ? '' : 'none';
+    clearBtn.style.display = items.length > 0 ? '' : 'none';
+
+    if (!items.length) {
+      listEl.innerHTML = '<div class="empty">まだ画像がありません</div>';
+      return;
+    }
+
+    listEl.innerHTML = '';
+    for (const item of items) {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = item.thumbUrl;
+      img.alt = '';
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = item.file.name;
+      meta.appendChild(name);
+
+      const sizes = document.createElement('div');
+      sizes.className = 'sizes';
+      if (item.status === 'done') {
+        const before = item.file.size;
+        const after = item.blob.size;
+        const pct = Math.round((1 - after / before) * 100);
+        const cls = after < before ? 'after' : 'worse';
+        sizes.innerHTML =
+          `${fmtBytes(before)} → <span class="${cls}">${fmtBytes(after)}</span>` +
+          (pct > 0 ? ` <span class="${cls}">（−${pct}%）</span>`
+                   : ` <span class="worse">（増えてます…設定を見直してみて）</span>`);
+        meta.appendChild(sizes);
+
+        const dims = document.createElement('div');
+        dims.className = 'dims';
+        dims.textContent = (item.ow === item.w && item.oh === item.h)
+          ? `${item.w}×${item.h}px`
+          : `${item.ow}×${item.oh} → ${item.w}×${item.h}px`;
+        meta.appendChild(dims);
+
+        if (pct > 0) {
+          const bar = document.createElement('div');
+          bar.className = 'bar';
+          const fill = document.createElement('div');
+          fill.className = 'fill';
+          fill.style.width = pct + '%';
+          bar.appendChild(fill);
+          meta.appendChild(bar);
+        }
+      } else if (item.status === 'working' || item.status === 'pending') {
+        sizes.innerHTML = `<span class="status">圧縮中…</span>`;
+        meta.appendChild(sizes);
+      } else {
+        sizes.innerHTML = `<span class="worse">変換に失敗しました</span>`;
+        meta.appendChild(sizes);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      if (item.status === 'done') {
+        const dl = document.createElement('button');
+        dl.className = 'btn';
+        dl.textContent = '保存';
+        dl.addEventListener('click', () => triggerDownload(item));
+        actions.appendChild(dl);
+      }
+      const rm = document.createElement('button');
+      rm.className = 'btn ghost';
+      rm.textContent = '消す';
+      rm.addEventListener('click', () => removeItem(item.id));
+      actions.appendChild(rm);
+
+      card.appendChild(img);
+      card.appendChild(meta);
+      card.appendChild(actions);
+      listEl.appendChild(card);
+    }
+  }
+})();
+</script>
+</body>
+</html>

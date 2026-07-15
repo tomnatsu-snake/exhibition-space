@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>裁断室 — スプライト切り出し</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --ink:#0e0d0f;
+    --panel:#17161a;
+    --panel2:#1e1c22;
+    --line:#2e2b33;
+    --text:#d8d2c8;
+    --dim:#8a8478;
+    --brass:#b39a5e;
+    --brass-bright:#d9bf7f;
+    --accept:#7fa886;
+    --danger:#b0705f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--ink);color:var(--text);
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    font-size:15px;line-height:1.6;min-height:100%}
+  body{padding:28px clamp(14px,3vw,40px) 60px}
+
+  header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:22px}
+  h1{font-size:26px;font-weight:600;letter-spacing:.35em;color:var(--brass-bright)}
+  header .sub{color:var(--dim);font-size:13px;letter-spacing:.08em}
+
+  /* ---- drop zone ---- */
+  #drop{border:1px dashed var(--line);border-radius:6px;padding:70px 20px;
+    text-align:center;color:var(--dim);cursor:pointer;transition:border-color .2s,color .2s}
+  #drop.over,#drop:hover{border-color:var(--brass);color:var(--brass-bright)}
+  #drop .big{font-size:17px;letter-spacing:.15em;margin-bottom:8px}
+  #drop input{display:none}
+
+  #workspace{display:none}
+  #workspace.active{display:block}
+
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+
+  /* ---- canvas ---- */
+  #canvasWrap{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    overflow:auto;max-height:72vh;position:relative}
+  #stage{position:relative;
+    background-image:
+      linear-gradient(45deg,#232128 25%,transparent 25%,transparent 75%,#232128 75%),
+      linear-gradient(45deg,#232128 25%,transparent 25%,transparent 75%,#232128 75%);
+    background-size:20px 20px;background-position:0 0,10px 10px;background-color:#1b1a1f;
+    width:max-content}
+  #stage canvas{display:block;image-rendering:pixelated}
+  #overlay{position:absolute;left:0;top:0;cursor:crosshair}
+  .canvasHint{color:var(--dim);font-size:12.5px;margin-top:8px;letter-spacing:.04em}
+
+  /* ---- panel ---- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    padding:16px 16px 18px;margin-bottom:16px}
+  .panel h2{font-size:13px;letter-spacing:.3em;color:var(--brass);font-weight:600;
+    margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .row{margin-bottom:14px}
+  .row:last-child{margin-bottom:0}
+  label.small{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12.5px;color:var(--dim);letter-spacing:.06em;margin-bottom:5px}
+  label.small .val{color:var(--text);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--brass);background:transparent}
+  select,input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);padding:7px 9px;border-radius:4px;font:inherit;font-size:13.5px}
+  select:focus,input:focus{outline:1px solid var(--brass)}
+  .sizeGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .checkline{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
+  .checkline input{accent-color:var(--brass)}
+
+  button{font:inherit;letter-spacing:.1em;cursor:pointer;border-radius:4px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--text);
+    padding:8px 14px;font-size:13.5px;transition:border-color .15s,color .15s}
+  button:hover{border-color:var(--brass);color:var(--brass-bright)}
+  button.primary{border-color:var(--brass);color:var(--brass-bright)}
+  button.primary:hover{background:#26222a}
+  button:disabled{opacity:.4;cursor:default;border-color:var(--line);color:var(--dim)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
+
+  .stat{font-size:12.5px;color:var(--dim);letter-spacing:.05em}
+  .stat b{color:var(--brass-bright);font-weight:600}
+
+  /* ---- results ---- */
+  #results{margin-top:26px}
+  #results h2{font-size:13px;letter-spacing:.3em;color:var(--brass);font-weight:600;margin-bottom:12px}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+  .cell{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;text-align:center}
+  .cell .thumbWrap{
+    background-image:
+      linear-gradient(45deg,#232128 25%,transparent 25%,transparent 75%,#232128 75%),
+      linear-gradient(45deg,#232128 25%,transparent 25%,transparent 75%,#232128 75%);
+    background-size:16px 16px;background-position:0 0,8px 8px;background-color:#1b1a1f;
+    border-radius:4px;margin-bottom:8px;line-height:0}
+  .cell img{width:100%;image-rendering:pixelated;border-radius:4px}
+  .cell .name{font-size:11.5px;color:var(--dim);margin-bottom:6px;word-break:break-all}
+  .cell button{padding:4px 10px;font-size:12px;width:100%}
+  footer{margin-top:40px;color:var(--dim);font-size:12px;letter-spacing:.1em;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>裁断室</h1>
+  <span class="sub">透過を保ったまま、スプライトを裁ち分ける仕立て部屋</span>
+</header>
+
+<div id="drop">
+  <div class="big">透過PNGをここに落とす</div>
+  <div>クリックして選ぶこともできます</div>
+  <input type="file" id="fileInput" accept="image/png,image/webp,image/gif">
+</div>
+
+<div id="workspace">
+  <div class="layout">
+    <div>
+      <div id="canvasWrap">
+        <div id="stage">
+          <canvas id="base"></canvas>
+          <canvas id="overlay"></canvas>
+        </div>
+      </div>
+      <div class="canvasHint">
+        枠をクリックで採用⇄除外を切り替え／空白をドラッグで手動の枠を追加／枠をダブルクリックで削除
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>検出</h2>
+        <div class="row">
+          <label class="small">透明の閾値（アルファ）<span class="val" id="vThresh">10</span></label>
+          <input type="range" id="thresh" min="1" max="128" value="10">
+        </div>
+        <div class="row">
+          <label class="small">結合距離 px（飛び散った粒をまとめる）<span class="val" id="vMerge">4</span></label>
+          <input type="range" id="merge" min="0" max="60" value="4">
+        </div>
+        <div class="row">
+          <label class="small">最小サイズ px（ノイズを捨てる）<span class="val" id="vMin">20</span></label>
+          <input type="range" id="minSize" min="2" max="120" value="20">
+        </div>
+        <div class="row btnrow">
+          <button id="redetect">再検出</button>
+          <button id="selAll">全て採用</button>
+          <button id="selNone">全て除外</button>
+        </div>
+        <div class="row stat" id="detStat"></div>
+      </div>
+
+      <div class="panel">
+        <h2>書き出し</h2>
+        <div class="row">
+          <label class="small">出力サイズ</label>
+          <select id="preset" style="margin-bottom:8px">
+            <option value="64">64 × 64</option>
+            <option value="128">128 × 128</option>
+            <option value="256" selected>256 × 256</option>
+            <option value="512">512 × 512</option>
+            <option value="custom">カスタム…</option>
+          </select>
+          <div class="sizeGrid" id="customRow" style="display:none;align-items:center">
+            <input type="number" id="customW" min="8" max="4096" value="256" placeholder="幅">
+            <input type="number" id="customH" min="8" max="4096" value="256" placeholder="高さ">
+          </div>
+          <label class="checkline" id="customHint" style="display:none;margin-top:6px;font-size:12px;color:var(--dim)">
+            左が幅、右が高さ（px）</label>
+        </div>
+        <div class="row">
+          <label class="small">余白（枠内に対する %）<span class="val" id="vPad">4</span></label>
+          <input type="range" id="pad" min="0" max="25" value="4">
+        </div>
+        <div class="row">
+          <label class="checkline"><input type="checkbox" id="pixelated" checked>
+            ドット絵として拡縮する（にじませない）</label>
+        </div>
+        <div class="row">
+          <label class="small">ファイル名の接頭辞</label>
+          <input type="number" style="display:none">
+          <input type="text" id="prefix" value="sprite" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:7px 9px;border-radius:4px;font:inherit;font-size:13.5px">
+        </div>
+        <div class="row btnrow">
+          <button class="primary" id="cutBtn">裁断する</button>
+          <button id="zipBtn" disabled>ZIPで受け取る</button>
+        </div>
+        <div class="row btnrow">
+          <button id="resetBtn">別の布に替える</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="results" style="display:none">
+    <h2>仕上がり</h2>
+    <div id="grid"></div>
+  </div>
+</div>
+
+<footer>裁断室 — 司書のおとも</footer>
+
+<script>
+(() => {
+'use strict';
+
+const $ = id => document.getElementById(id);
+const drop = $('drop'), fileInput = $('fileInput'), workspace = $('workspace');
+const baseC = $('base'), ovC = $('overlay'), stage = $('stage'), wrap = $('canvasWrap');
+const bctx = baseC.getContext('2d'), octx = ovC.getContext('2d');
+
+let img = null;          // HTMLImageElement
+let imgData = null;      // ImageData of full image
+let boxes = [];          // {x,y,w,h, on:true, manual:false}
+let scale = 1;           // display scale (CSS)
+let results = [];        // {name, blob, url}
+
+/* ---------- load ---------- */
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => {e.preventDefault(); drop.classList.add('over');});
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+fileInput.addEventListener('change', () => fileInput.files[0] && loadFile(fileInput.files[0]));
+
+function loadFile(f){
+  const url = URL.createObjectURL(f);
+  const im = new Image();
+  im.onload = () => {
+    URL.revokeObjectURL(url);
+    img = im;
+    setupCanvas();
+    detect();
+    drop.style.display = 'none';
+    workspace.classList.add('active');
+    clearResults();
+  };
+  im.src = url;
+}
+
+function setupCanvas(){
+  baseC.width = ovC.width = img.width;
+  baseC.height = ovC.height = img.height;
+  bctx.clearRect(0,0,img.width,img.height);
+  bctx.drawImage(img,0,0);
+  imgData = bctx.getImageData(0,0,img.width,img.height);
+  // fit display width
+  const avail = wrap.clientWidth || 800;
+  scale = Math.min(1.6, avail / img.width);
+  const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+  stage.style.width = w+'px';
+  for (const c of [baseC, ovC]){ c.style.width = w+'px'; c.style.height = h+'px'; }
+}
+
+/* ---------- detection ---------- */
+function detect(){
+  const thr = +$('thresh').value;
+  const mergeD = +$('merge').value;
+  const minS = +$('minSize').value;
+  const W = img.width, H = img.height, a = imgData.data;
+  const label = new Int32Array(W*H).fill(-1);
+  const found = [];
+  const qx = new Int32Array(W*H), qy = new Int32Array(W*H);
+
+  const solid = i => a[i*4+3] > thr;
+
+  for (let y=0; y<H; y++){
+    for (let x=0; x<W; x++){
+      const i = y*W+x;
+      if (label[i] !== -1 || !solid(i)) continue;
+      // BFS
+      let head=0, tail=0;
+      qx[tail]=x; qy[tail]=y; tail++;
+      label[i]=found.length;
+      let minx=x,maxx=x,miny=y,maxy=y;
+      while(head<tail){
+        const cx=qx[head], cy=qy[head]; head++;
+        if(cx<minx)minx=cx; if(cx>maxx)maxx=cx;
+        if(cy<miny)miny=cy; if(cy>maxy)maxy=cy;
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          if(!dx&&!dy)continue;
+          const nx=cx+dx, ny=cy+dy;
+          if(nx<0||ny<0||nx>=W||ny>=H)continue;
+          const ni=ny*W+nx;
+          if(label[ni]!==-1||!solid(ni))continue;
+          label[ni]=found.length;
+          qx[tail]=nx; qy[tail]=ny; tail++;
+        }
+      }
+      found.push({x:minx,y:miny,w:maxx-minx+1,h:maxy-miny+1});
+    }
+  }
+
+  // merge nearby boxes
+  let merged = found.slice();
+  let changed = true;
+  while(changed){
+    changed = false;
+    outer:
+    for(let i=0;i<merged.length;i++){
+      for(let j=i+1;j<merged.length;j++){
+        const A=merged[i], B=merged[j];
+        const gapX = Math.max(0, Math.max(A.x,B.x) - Math.min(A.x+A.w, B.x+B.w));
+        const gapY = Math.max(0, Math.max(A.y,B.y) - Math.min(A.y+A.h, B.y+B.h));
+        if(gapX<=mergeD && gapY<=mergeD){
+          const nx=Math.min(A.x,B.x), ny=Math.min(A.y,B.y);
+          merged[i]={x:nx,y:ny,
+            w:Math.max(A.x+A.w,B.x+B.w)-nx,
+            h:Math.max(A.y+A.h,B.y+B.h)-ny};
+          merged.splice(j,1);
+          changed=true; break outer;
+        }
+      }
+    }
+  }
+
+  const manual = boxes.filter(b=>b.manual);
+  boxes = merged
+    .filter(b => Math.min(b.w,b.h) >= minS)
+    .map(b => ({...b, on:true, manual:false}))
+    .concat(manual);
+  boxes.sort((p,q)=> (p.y+p.h/2) - (q.y+q.h/2) || p.x - q.x);
+  drawOverlay();
+  updateStat();
+}
+
+function updateStat(){
+  const on = boxes.filter(b=>b.on).length;
+  $('detStat').innerHTML = `検出 <b>${boxes.length}</b> 枠 ／ 採用 <b>${on}</b> 枠`;
+}
+
+/* ---------- overlay ---------- */
+let drag = null; // {x0,y0,x1,y1}
+function drawOverlay(){
+  octx.clearRect(0,0,ovC.width,ovC.height);
+  octx.lineWidth = Math.max(1, 2/scale);
+  octx.font = `${Math.max(11, 13/scale)}px sans-serif`;
+  let n = 0;
+  boxes.forEach(b=>{
+    if(b.on){ n++;
+      octx.strokeStyle = b.manual ? '#7fa886' : '#d9bf7f';
+      octx.fillStyle = 'rgba(217,191,127,0.07)';
+      octx.fillRect(b.x,b.y,b.w,b.h);
+      octx.strokeRect(b.x+.5,b.y+.5,b.w,b.h);
+      octx.fillStyle = b.manual ? '#7fa886' : '#d9bf7f';
+      octx.fillText(String(n).padStart(2,'0'), b.x+3, b.y+Math.max(12,14/scale));
+    } else {
+      octx.strokeStyle = 'rgba(138,132,120,0.45)';
+      octx.setLineDash([5,4]);
+      octx.strokeRect(b.x+.5,b.y+.5,b.w,b.h);
+      octx.setLineDash([]);
+    }
+  });
+  if(drag){
+    octx.strokeStyle = '#7fa886';
+    octx.setLineDash([4,3]);
+    const {x,y,w,h} = normDrag();
+    octx.strokeRect(x+.5,y+.5,w,h);
+    octx.setLineDash([]);
+  }
+}
+function normDrag(){
+  return {
+    x: Math.min(drag.x0,drag.x1), y: Math.min(drag.y0,drag.y1),
+    w: Math.abs(drag.x1-drag.x0), h: Math.abs(drag.y1-drag.y0)
+  };
+}
+function evtPos(e){
+  const r = ovC.getBoundingClientRect();
+  const cx = (e.touches? e.touches[0].clientX : e.clientX);
+  const cy = (e.touches? e.touches[0].clientY : e.clientY);
+  return {
+    x: Math.round((cx - r.left) / r.width * ovC.width),
+    y: Math.round((cy - r.top) / r.height * ovC.height)
+  };
+}
+function hitBox(p){
+  for(let i=boxes.length-1;i>=0;i--){
+    const b=boxes[i];
+    if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h) return i;
+  }
+  return -1;
+}
+
+let downPos=null, downHit=-1;
+ovC.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  downPos = evtPos(e);
+  downHit = hitBox(downPos);
+  if(downHit===-1) drag = {x0:downPos.x,y0:downPos.y,x1:downPos.x,y1:downPos.y};
+  ovC.setPointerCapture(e.pointerId);
+});
+ovC.addEventListener('pointermove', e=>{
+  if(!drag) return;
+  const p = evtPos(e);
+  drag.x1=p.x; drag.y1=p.y;
+  drawOverlay();
+});
+ovC.addEventListener('pointerup', e=>{
+  const p = evtPos(e);
+  if(drag){
+    const d = normDrag();
+    drag = null;
+    if(d.w>6 && d.h>6){
+      boxes.push({...d, on:true, manual:true});
+      boxes.sort((a,b)=> (a.y+a.h/2)-(b.y+b.h/2) || a.x-b.x);
+    }
+  } else if(downHit!==-1){
+    const nowHit = hitBox(p);
+    if(nowHit===downHit) boxes[downHit].on = !boxes[downHit].on;
+  }
+  drawOverlay(); updateStat();
+});
+ovC.addEventListener('dblclick', e=>{
+  const i = hitBox(evtPos(e));
+  if(i!==-1){ boxes.splice(i,1); drawOverlay(); updateStat(); }
+});
+
+/* ---------- controls ---------- */
+for(const [id,vid] of [['thresh','vThresh'],['merge','vMerge'],['minSize','vMin'],['pad','vPad']]){
+  $(id).addEventListener('input', ()=> $(vid).textContent = $(id).value);
+}
+let deb=null;
+for(const id of ['thresh','merge','minSize']){
+  $(id).addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(detect, 250); });
+}
+$('redetect').addEventListener('click', detect);
+$('selAll').addEventListener('click', ()=>{boxes.forEach(b=>b.on=true); drawOverlay(); updateStat();});
+$('selNone').addEventListener('click', ()=>{boxes.forEach(b=>b.on=false); drawOverlay(); updateStat();});
+$('preset').addEventListener('change', ()=>{
+  const custom = $('preset').value==='custom';
+  $('customRow').style.display = custom ? '' : 'none';
+  $('customHint').style.display = custom ? '' : 'none';
+});
+$('resetBtn').addEventListener('click', ()=>{
+  workspace.classList.remove('active');
+  drop.style.display = '';
+  fileInput.value = '';
+  boxes = []; clearResults();
+});
+
+/* ---------- cutting ---------- */
+function outSize(){
+  if($('preset').value==='custom'){
+    return {
+      w: Math.max(8, +$('customW').value||256),
+      h: Math.max(8, +$('customH').value||256)
+    };
+  }
+  const s = +$('preset').value;
+  return {w:s, h:s};
+}
+function sizeTag(){
+  const {w,h} = outSize();
+  return w===h ? String(w) : `${w}x${h}`;
+}
+function clearResults(){
+  results.forEach(r=>URL.revokeObjectURL(r.url));
+  results = [];
+  $('grid').innerHTML = '';
+  $('results').style.display = 'none';
+  $('zipBtn').disabled = true;
+}
+
+$('cutBtn').addEventListener('click', async ()=>{
+  const {w:OW, h:OH} = outSize();
+  const padPct = +$('pad').value/100;
+  const pix = $('pixelated').checked;
+  const prefix = ($('prefix').value||'sprite').trim() || 'sprite';
+  const active = boxes.filter(b=>b.on);
+  if(!active.length) return;
+  clearResults();
+
+  let n = 0;
+  for(const b of active){
+    n++;
+    const c = document.createElement('canvas');
+    c.width = OW; c.height = OH;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = !pix;
+    if(!pix) ctx.imageSmoothingQuality = 'high';
+    // area available after padding, keep sprite aspect, center
+    const availW = OW * (1 - padPct*2);
+    const availH = OH * (1 - padPct*2);
+    const sc = Math.min(availW/b.w, availH/b.h);
+    const dw = b.w*sc, dh = b.h*sc;
+    ctx.drawImage(img, b.x, b.y, b.w, b.h, (OW-dw)/2, (OH-dh)/2, dw, dh);
+    const blob = await new Promise(res=>c.toBlob(res,'image/png'));
+    const name = `${prefix}_${String(n).padStart(2,'0')}_${sizeTag()}.png`;
+    results.push({name, blob, url:URL.createObjectURL(blob)});
+  }
+
+  const grid = $('grid');
+  results.forEach(r=>{
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = `<div class="thumbWrap"><img src="${r.url}" alt="${r.name}"></div>
+      <div class="name">${r.name}</div>`;
+    const btn = document.createElement('button');
+    btn.textContent = '保存';
+    btn.addEventListener('click', ()=>{
+      const a=document.createElement('a'); a.href=r.url; a.download=r.name; a.click();
+    });
+    cell.appendChild(btn);
+    grid.appendChild(cell);
+  });
+  $('results').style.display = '';
+  $('zipBtn').disabled = false;
+  $('results').scrollIntoView({behavior:'smooth'});
+});
+
+$('zipBtn').addEventListener('click', async ()=>{
+  if(!results.length) return;
+  const zip = new JSZip();
+  for(const r of results) zip.file(r.name, r.blob);
+  const blob = await zip.generateAsync({type:'blob'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${($('prefix').value||'sprite').trim()||'sprite'}_${sizeTag()}.zip`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+});
+
+window.addEventListener('resize', ()=>{ if(img){ 
+  const avail = wrap.clientWidth || 800;
+  scale = Math.min(1.6, avail / img.width);
+  const w = Math.round(img.width*scale);
+  stage.style.width = w+'px';
+  for (const c of [baseC, ovC]){ c.style.width = w+'px'; c.style.height = Math.round(img.height*scale)+'px'; }
+}});
+
+})();
+</script>
+</body>
+</html>

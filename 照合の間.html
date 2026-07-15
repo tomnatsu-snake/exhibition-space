@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>照合の間 — テキスト比較</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15171e;
+    --panel:#1d2029;
+    --edge:#2c303d;
+    --ink:#e6e1d6;
+    --dim:#8f8a7d;
+    --brass:#c9a15f;
+    --del-bg:rgba(196,86,110,.14);
+    --del-strong:rgba(196,86,110,.45);
+    --del-text:#eeb3c1;
+    --ins-bg:rgba(88,168,124,.13);
+    --ins-strong:rgba(88,168,124,.42);
+    --ins-text:#aadcc0;
+    --serif:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    --mono:"SF Mono","Consolas","Menlo","Noto Sans Mono","Hiragino Sans","Yu Gothic",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.7}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
+
+  header{margin-bottom:26px;border-bottom:1px solid var(--edge);padding-bottom:18px}
+  header h1{font-family:var(--serif);font-weight:700;font-size:26px;letter-spacing:.35em;color:var(--ink)}
+  header h1 .fleuron{color:var(--brass);letter-spacing:0;margin-right:.4em}
+  header p{color:var(--dim);font-size:12.5px;margin-top:6px;letter-spacing:.08em}
+
+  /* ── 入力 ── */
+  .inputs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:760px){.inputs{grid-template-columns:1fr}}
+  .pane{background:var(--panel);border:1px solid var(--edge);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
+  .pane-head{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--edge)}
+  .pane-head .tag{font-family:var(--serif);font-weight:700;color:var(--brass);font-size:15px;letter-spacing:.15em}
+  .pane-head .fname{color:var(--dim);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .filebtn{background:transparent;border:1px solid var(--edge);color:var(--dim);font-family:var(--mono);font-size:11.5px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
+  .filebtn:hover,.filebtn:focus-visible{color:var(--brass);border-color:var(--brass)}
+  textarea{width:100%;height:220px;background:transparent;border:none;color:var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.7;padding:12px;resize:vertical;outline:none}
+  textarea::placeholder{color:#565b69}
+  .pane.dragover{border-color:var(--brass)}
+
+  /* ── 操作列 ── */
+  .actions{display:flex;align-items:center;gap:12px;margin:18px 0 0;flex-wrap:wrap}
+  .btn-main{background:var(--brass);color:#1a1408;border:none;font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.25em;padding:10px 34px 10px 38px;border-radius:4px;cursor:pointer;transition:filter .15s}
+  .btn-main:hover,.btn-main:focus-visible{filter:brightness(1.12)}
+  .btn-sub{background:transparent;border:1px solid var(--edge);color:var(--dim);font-family:var(--mono);font-size:12px;padding:8px 14px;border-radius:4px;cursor:pointer;transition:color .15s,border-color .15s}
+  .btn-sub:hover,.btn-sub:focus-visible{color:var(--ink);border-color:var(--dim)}
+  :focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+  /* ── 結果 ── */
+  #result{margin-top:34px;display:none}
+  .resbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 14px;background:var(--panel);border:1px solid var(--edge);border-radius:6px 6px 0 0;position:sticky;top:0;z-index:5}
+  .stat{font-size:12px;color:var(--dim);letter-spacing:.05em}
+  .stat b{font-weight:normal}
+  .stat.ins b{color:var(--ins-text)}
+  .stat.del b{color:var(--del-text)}
+  .stat.mod b{color:var(--brass)}
+  .resbar .nav{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .navbtn{background:transparent;border:1px solid var(--edge);color:var(--dim);font-family:var(--mono);font-size:12px;padding:4px 12px;border-radius:4px;cursor:pointer}
+  .navbtn:hover,.navbtn:focus-visible{color:var(--brass);border-color:var(--brass)}
+  .navpos{font-size:11.5px;color:var(--dim);min-width:56px;text-align:center}
+  .viewtoggle{display:flex;border:1px solid var(--edge);border-radius:4px;overflow:hidden}
+  .viewtoggle button{background:transparent;border:none;color:var(--dim);font-family:var(--mono);font-size:11.5px;padding:5px 12px;cursor:pointer}
+  .viewtoggle button.on{background:var(--edge);color:var(--ink)}
+
+  .diffbox{border:1px solid var(--edge);border-top:none;border-radius:0 0 6px 6px;overflow-x:auto;background:var(--panel)}
+  table.diff{border-collapse:collapse;width:100%;font-size:13px;line-height:1.75}
+  table.diff td{vertical-align:top;padding:1px 10px;white-space:pre-wrap;word-break:break-all}
+  td.ln{color:#565b69;text-align:right;user-select:none;padding:1px 8px;min-width:3.2em;font-size:11px;border-right:1px solid var(--edge)}
+  tr.r-del td.side-a{background:var(--del-bg)}
+  tr.r-ins td.side-b{background:var(--ins-bg)}
+  tr.r-mod td.side-a{background:var(--del-bg)}
+  tr.r-mod td.side-b{background:var(--ins-bg)}
+  tr.u-del td.body{background:var(--del-bg)}
+  tr.u-ins td.body{background:var(--ins-bg)}
+  mark.d{background:var(--del-strong);color:#fff;border-radius:2px;padding:0 1px}
+  mark.i{background:var(--ins-strong);color:#fff;border-radius:2px;padding:0 1px}
+  tr.current td{box-shadow:inset 3px 0 0 var(--brass)}
+  td.empty{background:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(255,255,255,.02) 6px,rgba(255,255,255,.02) 12px)}
+  .sign{padding:1px 6px;color:#565b69;user-select:none;font-size:11px}
+
+  .same-note{color:var(--dim);padding:28px;text-align:center;font-family:var(--serif);letter-spacing:.2em;font-size:15px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="fleuron">❦</span>照合の間</h1>
+    <p>ふたつのテキストを照らし合わせ、相違のある箇所に印をつけます。貼り付けでも、ファイルでも。</p>
+  </header>
+
+  <div class="inputs">
+    <div class="pane" id="paneA">
+      <div class="pane-head">
+        <span class="tag">甲</span>
+        <span class="fname" id="fnameA">貼り付け、またはファイルをドロップ</span>
+        <button class="filebtn" onclick="document.getElementById('fileA').click()">ファイルを開く</button>
+        <input type="file" id="fileA" hidden>
+      </div>
+      <textarea id="textA" placeholder="こちらに元のテキストを……" spellcheck="false"></textarea>
+    </div>
+    <div class="pane" id="paneB">
+      <div class="pane-head">
+        <span class="tag">乙</span>
+        <span class="fname" id="fnameB">貼り付け、またはファイルをドロップ</span>
+        <button class="filebtn" onclick="document.getElementById('fileB').click()">ファイルを開く</button>
+        <input type="file" id="fileB" hidden>
+      </div>
+      <textarea id="textB" placeholder="こちらに比較したいテキストを……" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-main" onclick="runCompare()">照合する</button>
+    <button class="btn-sub" onclick="swapSides()">甲⇄乙 入れ替え</button>
+    <button class="btn-sub" onclick="clearAll()">すべて消す</button>
+  </div>
+
+  <div id="result">
+    <div class="resbar">
+      <span class="stat mod"><b id="statMod">0</b> 変更</span>
+      <span class="stat ins"><b id="statIns">0</b> 追加</span>
+      <span class="stat del"><b id="statDel">0</b> 削除</span>
+      <div class="nav">
+        <div class="viewtoggle">
+          <button id="vSide" class="on" onclick="setView('side')">左右</button>
+          <button id="vUni" onclick="setView('uni')">縦並び</button>
+        </div>
+        <button class="navbtn" onclick="jumpDiff(-1)" aria-label="前の相違点">▲ 前</button>
+        <span class="navpos" id="navPos">–/–</span>
+        <button class="navbtn" onclick="jumpDiff(1)" aria-label="次の相違点">▼ 次</button>
+      </div>
+    </div>
+    <div class="diffbox" id="diffbox"></div>
+  </div>
+</div>
+
+<script>
+/* ───────── ファイル読み込み（UTF-8 → だめならShift_JISを試す） ───────── */
+function readFileSmart(file, cb){
+  const r = new FileReader();
+  r.onload = () => {
+    const buf = r.result;
+    let text;
+    try { text = new TextDecoder('utf-8', {fatal:true}).decode(buf); }
+    catch(e){
+      try { text = new TextDecoder('shift_jis').decode(buf); }
+      catch(e2){ text = new TextDecoder('utf-8').decode(buf); }
+    }
+    cb(text);
+  };
+  r.readAsArrayBuffer(file);
+}
+function hookFile(inputId, textId, nameId){
+  document.getElementById(inputId).addEventListener('change', ev=>{
+    const f = ev.target.files[0]; if(!f) return;
+    readFileSmart(f, t=>{
+      document.getElementById(textId).value = t;
+      document.getElementById(nameId).textContent = f.name;
+    });
+    ev.target.value = '';
+  });
+}
+hookFile('fileA','textA','fnameA');
+hookFile('fileB','textB','fnameB');
+
+/* ドラッグ&ドロップ */
+[['paneA','textA','fnameA'],['paneB','textB','fnameB']].forEach(([pid,tid,nid])=>{
+  const pane = document.getElementById(pid);
+  pane.addEventListener('dragover', e=>{e.preventDefault(); pane.classList.add('dragover');});
+  pane.addEventListener('dragleave', ()=>pane.classList.remove('dragover'));
+  pane.addEventListener('drop', e=>{
+    e.preventDefault(); pane.classList.remove('dragover');
+    const f = e.dataTransfer.files[0]; if(!f) return;
+    readFileSmart(f, t=>{
+      document.getElementById(tid).value = t;
+      document.getElementById(nid).textContent = f.name;
+    });
+  });
+});
+
+/* ───────── diffコア：共通接頭辞・接尾辞を刈ってからLCS ───────── */
+function diffSeq(a, b){
+  let pre = 0;
+  while(pre < a.length && pre < b.length && a[pre] === b[pre]) pre++;
+  let sufA = a.length, sufB = b.length;
+  while(sufA > pre && sufB > pre && a[sufA-1] === b[sufB-1]){ sufA--; sufB--; }
+  const midA = a.slice(pre, sufA), midB = b.slice(pre, sufB);
+  const ops = [];
+  for(let i=0;i<pre;i++) ops.push({t:'=', ai:i, bi:i});
+
+  const n = midA.length, m = midB.length;
+  if(n*m > 4_000_000){
+    // 大きすぎる場合は中央部を丸ごと差し替え扱い
+    for(let i=0;i<n;i++) ops.push({t:'-', ai:pre+i});
+    for(let j=0;j<m;j++) ops.push({t:'+', bi:pre+j});
+  } else if(n===0){
+    for(let j=0;j<m;j++) ops.push({t:'+', bi:pre+j});
+  } else if(m===0){
+    for(let i=0;i<n;i++) ops.push({t:'-', ai:pre+i});
+  } else {
+    // LCS DP
+    const dp = new Uint32Array((n+1)*(m+1));
+    for(let i=n-1;i>=0;i--){
+      for(let j=m-1;j>=0;j--){
+        dp[i*(m+1)+j] = midA[i]===midB[j]
+          ? dp[(i+1)*(m+1)+j+1]+1
+          : Math.max(dp[(i+1)*(m+1)+j], dp[i*(m+1)+j+1]);
+      }
+    }
+    let i=0,j=0;
+    while(i<n && j<m){
+      if(midA[i]===midB[j]){ ops.push({t:'=', ai:pre+i, bi:pre+j}); i++; j++; }
+      else if(dp[(i+1)*(m+1)+j] >= dp[i*(m+1)+j+1]){ ops.push({t:'-', ai:pre+i}); i++; }
+      else { ops.push({t:'+', bi:pre+j}); j++; }
+    }
+    while(i<n){ ops.push({t:'-', ai:pre+i}); i++; }
+    while(j<m){ ops.push({t:'+', bi:pre+j}); j++; }
+  }
+  for(let k=sufA;k<a.length;k++){
+    ops.push({t:'=', ai:k, bi:k+(b.length-a.length)});
+  }
+  return ops;
+}
+
+/* 文字単位のインラインdiff（変更行のペア用） */
+function charDiffHTML(sa, sb){
+  if(sa.length > 1200 || sb.length > 1200){
+    return { a: `<mark class="d">${esc(sa)}</mark>`, b: `<mark class="i">${esc(sb)}</mark>` };
+  }
+  const ops = diffSeq([...sa], [...sb]);
+  let ha='', hb='', bufD='', bufI='';
+  const flush = ()=>{
+    if(bufD){ ha += `<mark class="d">${esc(bufD)}</mark>`; bufD=''; }
+    if(bufI){ hb += `<mark class="i">${esc(bufI)}</mark>`; bufI=''; }
+  };
+  const ca=[...sa], cb=[...sb];
+  for(const op of ops){
+    if(op.t==='='){ flush(); ha+=esc(ca[op.ai]); hb+=esc(cb[op.bi]); }
+    else if(op.t==='-') bufD += ca[op.ai];
+    else bufI += cb[op.bi];
+  }
+  flush();
+  return { a: ha, b: hb };
+}
+
+function esc(s){
+  return (s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* 行diff → 表示用の行ペア列を作る */
+function buildRows(ta, tb){
+  const la = ta.split('\n'), lb = tb.split('\n');
+  const ops = diffSeq(la, lb);
+  const rows = [];
+  let i = 0;
+  while(i < ops.length){
+    const op = ops[i];
+    if(op.t === '='){
+      rows.push({type:'same', a:la[op.ai], b:lb[op.bi], an:op.ai+1, bn:op.bi+1});
+      i++;
+    } else {
+      // 連続する削除・追加ブロックを収集してペアリング
+      const dels=[], inss=[];
+      while(i < ops.length && ops[i].t !== '='){
+        if(ops[i].t === '-') dels.push(ops[i].ai);
+        else inss.push(ops[i].bi);
+        i++;
+      }
+      const pairs = Math.min(dels.length, inss.length);
+      for(let k=0;k<pairs;k++){
+        const inline = charDiffHTML(la[dels[k]], lb[inss[k]]);
+        rows.push({type:'mod', aHTML:inline.a, bHTML:inline.b, an:dels[k]+1, bn:inss[k]+1});
+      }
+      for(let k=pairs;k<dels.length;k++)
+        rows.push({type:'del', a:la[dels[k]], an:dels[k]+1});
+      for(let k=pairs;k<inss.length;k++)
+        rows.push({type:'ins', b:lb[inss[k]], bn:inss[k]+1});
+    }
+  }
+  return rows;
+}
+
+/* ───────── 描画 ───────── */
+let ROWS = [], VIEW = 'side', diffAnchors = [], curDiff = -1;
+
+function runCompare(){
+  const ta = document.getElementById('textA').value;
+  const tb = document.getElementById('textB').value;
+  ROWS = buildRows(ta, tb);
+  // 既定ビュー：狭い画面なら縦並び
+  VIEW = window.innerWidth < 760 ? 'uni' : VIEW;
+  render();
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function render(){
+  document.getElementById('vSide').classList.toggle('on', VIEW==='side');
+  document.getElementById('vUni').classList.toggle('on', VIEW==='uni');
+
+  let mod=0, ins=0, del=0;
+  ROWS.forEach(r=>{ if(r.type==='mod')mod++; else if(r.type==='ins')ins++; else if(r.type==='del')del++; });
+  document.getElementById('statMod').textContent = mod;
+  document.getElementById('statIns').textContent = ins;
+  document.getElementById('statDel').textContent = del;
+
+  const box = document.getElementById('diffbox');
+  if(mod+ins+del === 0){
+    box.innerHTML = '<div class="same-note">— 相違なし。ふたつは同一です —</div>';
+    diffAnchors = []; curDiff = -1; updateNavPos();
+    return;
+  }
+
+  const parts = ['<table class="diff"><tbody>'];
+  diffAnchors = [];
+  let prevWasDiff = false;
+
+  ROWS.forEach((r, idx)=>{
+    const isDiff = r.type !== 'same';
+    if(isDiff && !prevWasDiff) diffAnchors.push(idx);
+    prevWasDiff = isDiff;
+
+    if(VIEW === 'side'){
+      const aBody = r.type==='mod' ? r.aHTML : esc(r.a);
+      const bBody = r.type==='mod' ? r.bHTML : esc(r.b);
+      const aCell = (r.type==='ins') ? '<td class="side-a empty"></td>' : `<td class="side-a">${aBody||'&nbsp;'}</td>`;
+      const bCell = (r.type==='del') ? '<td class="side-b empty"></td>' : `<td class="side-b">${bBody||'&nbsp;'}</td>`;
+      parts.push(`<tr id="row${idx}" class="r-${r.type}">`+
+        `<td class="ln">${r.an??''}</td>${aCell}`+
+        `<td class="ln">${r.bn??''}</td>${bCell}</tr>`);
+    } else {
+      if(r.type==='same'){
+        parts.push(`<tr id="row${idx}"><td class="ln">${r.an}</td><td class="ln">${r.bn}</td><td class="sign"></td><td class="body">${esc(r.a)||'&nbsp;'}</td></tr>`);
+      } else if(r.type==='mod'){
+        parts.push(`<tr id="row${idx}" class="u-del"><td class="ln">${r.an}</td><td class="ln"></td><td class="sign">−</td><td class="body">${r.aHTML||'&nbsp;'}</td></tr>`);
+        parts.push(`<tr class="u-ins"><td class="ln"></td><td class="ln">${r.bn}</td><td class="sign">＋</td><td class="body">${r.bHTML||'&nbsp;'}</td></tr>`);
+      } else if(r.type==='del'){
+        parts.push(`<tr id="row${idx}" class="u-del"><td class="ln">${r.an}</td><td class="ln"></td><td class="sign">−</td><td class="body">${esc(r.a)||'&nbsp;'}</td></tr>`);
+      } else {
+        parts.push(`<tr id="row${idx}" class="u-ins"><td class="ln"></td><td class="ln">${r.bn}</td><td class="sign">＋</td><td class="body">${esc(r.b)||'&nbsp;'}</td></tr>`);
+      }
+    }
+  });
+  parts.push('</tbody></table>');
+  box.innerHTML = parts.join('');
+  curDiff = -1;
+  updateNavPos();
+}
+
+function setView(v){ VIEW = v; render(); }
+
+function jumpDiff(dir){
+  if(diffAnchors.length === 0) return;
+  curDiff = (curDiff + dir + diffAnchors.length) % diffAnchors.length;
+  document.querySelectorAll('tr.current').forEach(el=>el.classList.remove('current'));
+  const row = document.getElementById('row' + diffAnchors[curDiff]);
+  if(row){
+    row.classList.add('current');
+    row.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+  updateNavPos();
+}
+function updateNavPos(){
+  document.getElementById('navPos').textContent =
+    diffAnchors.length ? `${curDiff<0?'–':curDiff+1}/${diffAnchors.length}` : '–/–';
+}
+
+function swapSides(){
+  const a = document.getElementById('textA'), b = document.getElementById('textB');
+  [a.value, b.value] = [b.value, a.value];
+  const fa = document.getElementById('fnameA'), fb = document.getElementById('fnameB');
+  [fa.textContent, fb.textContent] = [fb.textContent, fa.textContent];
+}
+function clearAll(){
+  document.getElementById('textA').value = '';
+  document.getElementById('textB').value = '';
+  document.getElementById('fnameA').textContent = '貼り付け、またはファイルをドロップ';
+  document.getElementById('fnameB').textContent = '貼り付け、またはファイルをドロップ';
+  document.getElementById('result').style.display = 'none';
+}
+</script>
+</body>
+</html>

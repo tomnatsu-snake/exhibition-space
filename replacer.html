@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>置換の間</title>
+<style>
+  :root {
+    --bg: #0e0e12;
+    --surface: #18181f;
+    --surface-hover: #1f1f28;
+    --border: #2a2a35;
+    --text: #d4d2cc;
+    --text-dim: #8a8880;
+    --accent: #7c6f5b;
+    --accent-light: #a69880;
+    --accent-glow: rgba(124, 111, 91, 0.15);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --surface-hover: #f0ede8;
+      --border: #ddd8d0;
+      --text: #2a2824;
+      --text-dim: #7a756d;
+      --accent: #7c6f5b;
+      --accent-light: #5c5245;
+      --accent-glow: rgba(124, 111, 91, 0.08);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+    padding: 2rem 1.5rem;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: var(--accent-light);
+    letter-spacing: 0.05em;
+    margin-bottom: 2rem;
+  }
+  .section-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+  }
+  .pair-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .pair-input {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    transition: border-color 0.2s;
+  }
+  .pair-input:focus { border-color: var(--accent); }
+  .pair-input::placeholder { color: var(--text-dim); opacity: 0.5; }
+  .arrow {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+  .remove-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    font-family: inherit;
+    line-height: 1;
+  }
+  .remove-btn:hover {
+    color: var(--accent-light);
+    border-color: var(--border);
+  }
+  .add-btn {
+    padding: 0.35rem 0.9rem;
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    margin-top: 0.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .add-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent-light);
+  }
+  .add-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .add-btn:disabled:hover {
+    border-color: var(--border);
+    color: var(--text-dim);
+  }
+  textarea {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'Noto Sans JP', 'Hiragino Sans', monospace;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    resize: vertical;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-dim); opacity: 0.6; }
+  .action-btn {
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: var(--accent-glow);
+    color: var(--accent-light);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+  }
+  .action-btn:hover {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .action-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .action-btn:disabled:hover {
+    background: var(--accent-glow);
+    color: var(--accent-light);
+  }
+  .action-btn.small {
+    padding: 0.35rem 1rem;
+    font-size: 0.8rem;
+  }
+  .actions { display: flex; gap: 0.75rem; margin: 1.25rem 0 2rem; }
+  .output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .output-header .section-label { margin-bottom: 0; }
+  #output-section { display: none; }
+  .count-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    opacity: 0.6;
+    margin-left: auto;
+  }
+  .pairs-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>置換の間</h1>
+
+  <div>
+    <div class="pairs-header">
+      <div class="section-label" style="margin-bottom:0">置換ペア</div>
+      <span class="count-label" id="pair-count">1 / 6</span>
+    </div>
+    <div id="pairs-container">
+      <div class="pair-row" data-index="0">
+        <input type="text" class="pair-input from" placeholder="置換前">
+        <span class="arrow">→</span>
+        <input type="text" class="pair-input to" placeholder="置換後">
+        <button class="remove-btn" title="削除">×</button>
+      </div>
+    </div>
+    <button class="add-btn" id="add-btn">＋ 追加</button>
+  </div>
+
+  <div>
+    <div class="section-label">テキストを貼り付け</div>
+    <textarea id="input" rows="10" placeholder="置換したいテキストをここに……"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="action-btn" id="replace-btn">置換する</button>
+  </div>
+
+  <div id="output-section">
+    <div class="output-header">
+      <div class="section-label">出力</div>
+      <button class="action-btn small" id="copy-btn">コピー</button>
+    </div>
+    <textarea id="output" rows="12" readonly style="cursor:default"></textarea>
+  </div>
+</div>
+
+<script>
+(function() {
+  const MAX_PAIRS = 6;
+  const container = document.getElementById("pairs-container");
+  const addBtn = document.getElementById("add-btn");
+  const countLabel = document.getElementById("pair-count");
+  const inputEl = document.getElementById("input");
+  const outputEl = document.getElementById("output");
+  const outputSection = document.getElementById("output-section");
+  const replaceBtn = document.getElementById("replace-btn");
+  const copyBtn = document.getElementById("copy-btn");
+
+  function updateCount() {
+    const n = container.querySelectorAll(".pair-row").length;
+    countLabel.textContent = n + " / " + MAX_PAIRS;
+    addBtn.disabled = n >= MAX_PAIRS;
+  }
+
+  function createRow() {
+    const row = document.createElement("div");
+    row.className = "pair-row";
+    row.innerHTML =
+      '<input type="text" class="pair-input from" placeholder="置換前">' +
+      '<span class="arrow">→</span>' +
+      '<input type="text" class="pair-input to" placeholder="置換後">' +
+      '<button class="remove-btn" title="削除">×</button>';
+    row.querySelector(".remove-btn").addEventListener("click", function() {
+      const rows = container.querySelectorAll(".pair-row");
+      if (rows.length <= 1) return;
+      row.remove();
+      updateCount();
+    });
+    return row;
+  }
+
+  // Wire up the initial row's remove button
+  container.querySelector(".remove-btn").addEventListener("click", function() {
+    const rows = container.querySelectorAll(".pair-row");
+    if (rows.length <= 1) return;
+    this.closest(".pair-row").remove();
+    updateCount();
+  });
+
+  addBtn.addEventListener("click", function() {
+    const rows = container.querySelectorAll(".pair-row");
+    if (rows.length >= MAX_PAIRS) return;
+    container.appendChild(createRow());
+    updateCount();
+  });
+
+  replaceBtn.addEventListener("click", function() {
+    const raw = inputEl.value;
+    if (!raw.trim()) return;
+
+    const rows = container.querySelectorAll(".pair-row");
+    let result = raw;
+
+    rows.forEach(function(row) {
+      const from = row.querySelector(".from").value;
+      const to = row.querySelector(".to").value;
+      if (!from) return;
+      // Escape regex special chars
+      const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      result = result.replace(new RegExp(escaped, "g"), to);
+    });
+
+    outputEl.value = result;
+    outputSection.style.display = "block";
+  });
+
+  copyBtn.addEventListener("click", function() {
+    if (!outputEl.value) return;
+    navigator.clipboard.writeText(outputEl.value).then(function() {
+      copyBtn.textContent = "✓ コピーした";
+      setTimeout(function() { copyBtn.textContent = "コピー"; }, 2000);
+    }).catch(function() {
+      var ta = document.createElement("textarea");
+      ta.value = outputEl.value;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      copyBtn.textContent = "✓ コピーした";
+      setTimeout(function() { copyBtn.textContent = "コピー"; }, 2000);
+    });
+  });
+
+  updateCount();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鏡の間 — 画像反転</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --ink:#0e0d0f;
+    --panel:#17161a;
+    --panel2:#1e1c22;
+    --line:#2e2b33;
+    --text:#d8d2c8;
+    --dim:#8a8478;
+    --brass:#b39a5e;
+    --brass-bright:#d9bf7f;
+    --accept:#7fa886;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--ink);color:var(--text);
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    font-size:15px;line-height:1.6;min-height:100%}
+  body{padding:28px clamp(14px,3vw,40px) 60px}
+
+  header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:22px}
+  h1{font-size:26px;font-weight:600;letter-spacing:.35em;color:var(--brass-bright)}
+  header .sub{color:var(--dim);font-size:13px;letter-spacing:.08em}
+
+  #drop{border:1px dashed var(--line);border-radius:6px;padding:56px 20px;
+    text-align:center;color:var(--dim);cursor:pointer;transition:border-color .2s,color .2s;
+    margin-bottom:20px}
+  #drop.over,#drop:hover{border-color:var(--brass);color:var(--brass-bright)}
+  #drop .big{font-size:17px;letter-spacing:.15em;margin-bottom:8px}
+  #drop input{display:none}
+
+  #toolbar{display:none;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  #toolbar.active{display:flex}
+  #toolbar .spacer{flex:1}
+  #toolbar .stat{font-size:12.5px;color:var(--dim);letter-spacing:.05em}
+  #toolbar .stat b{color:var(--brass-bright)}
+
+  button{font:inherit;letter-spacing:.1em;cursor:pointer;border-radius:4px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--text);
+    padding:8px 14px;font-size:13.5px;transition:border-color .15s,color .15s}
+  button:hover{border-color:var(--brass);color:var(--brass-bright)}
+  button.primary{border-color:var(--brass);color:var(--brass-bright)}
+  button.primary:hover{background:#26222a}
+  button.mini{padding:4px 9px;font-size:12px;letter-spacing:.05em}
+  button.on{border-color:var(--accept);color:var(--accept)}
+
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+  .cell{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+  .thumbWrap{
+    background-image:
+      linear-gradient(45deg,#232128 25%,transparent 25%,transparent 75%,#232128 75%),
+      linear-gradient(45deg,#232128 25%,transparent 25%,transparent 75%,#232128 75%);
+    background-size:16px 16px;background-position:0 0,8px 8px;background-color:#1b1a1f;
+    border-radius:4px;margin-bottom:10px;line-height:0;
+    display:flex;align-items:center;justify-content:center;min-height:120px;overflow:hidden}
+  .thumbWrap canvas{max-width:100%;max-height:220px;image-rendering:pixelated}
+  .cell .name{font-size:11.5px;color:var(--dim);margin-bottom:8px;word-break:break-all;line-height:1.4}
+  .cell .flipState{font-size:11px;color:var(--accept);min-height:16px;margin-bottom:8px;letter-spacing:.05em}
+  .cell .btns{display:flex;gap:6px;flex-wrap:wrap}
+  .cell .btns button{flex:1;min-width:0}
+
+  footer{margin-top:40px;color:var(--dim);font-size:12px;letter-spacing:.1em;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>鏡の間</h1>
+  <span class="sub">透過を保ったまま、像を映し返す部屋</span>
+</header>
+
+<div id="drop">
+  <div class="big">透過PNGをここに落とす（複数可）</div>
+  <div>クリックして選ぶこともできます／追加で落とせば列に加わります</div>
+  <input type="file" id="fileInput" accept="image/png,image/webp,image/gif" multiple>
+</div>
+
+<div id="toolbar">
+  <button id="allH">全て左右反転</button>
+  <button id="allV">全て上下反転</button>
+  <button id="allReset">全て元に戻す</button>
+  <span class="spacer"></span>
+  <span class="stat" id="stat"></span>
+  <button class="primary" id="zipBtn">ZIPで受け取る</button>
+  <button id="clearBtn">列を空にする</button>
+</div>
+
+<div id="grid"></div>
+
+<footer>鏡の間 — 司書のおとも</footer>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const drop = $('drop'), fileInput = $('fileInput'), grid = $('grid'), toolbar = $('toolbar');
+
+let items = []; // {img, name, baseName, h:false, v:false, canvas, stateEl, hBtn, vBtn}
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => {e.preventDefault(); drop.classList.add('over');});
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  addFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value=''; });
+
+function addFiles(list){
+  for(const f of list){
+    if(!f.type.startsWith('image/')) continue;
+    const url = URL.createObjectURL(f);
+    const im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); addItem(im, f.name); };
+    im.src = url;
+  }
+}
+
+function addItem(img, name){
+  const baseName = name.replace(/\.[^.]+$/, '');
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+
+  const tw = document.createElement('div');
+  tw.className = 'thumbWrap';
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width; canvas.height = img.height;
+  tw.appendChild(canvas);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name';
+  nameEl.textContent = `${name}（${img.width}×${img.height}）`;
+
+  const stateEl = document.createElement('div');
+  stateEl.className = 'flipState';
+
+  const btns = document.createElement('div');
+  btns.className = 'btns';
+  const hBtn = mini('左右');
+  const vBtn = mini('上下');
+  const dlBtn = mini('保存');
+  btns.append(hBtn, vBtn, dlBtn);
+
+  cell.append(tw, nameEl, stateEl, btns);
+  grid.appendChild(cell);
+
+  const item = {img, name, baseName, h:false, v:false, canvas, stateEl, hBtn, vBtn};
+  items.push(item);
+
+  hBtn.addEventListener('click', ()=>{ item.h = !item.h; render(item); });
+  vBtn.addEventListener('click', ()=>{ item.v = !item.v; render(item); });
+  dlBtn.addEventListener('click', async ()=>{
+    const blob = await toBlob(item);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = outName(item); a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  });
+
+  render(item);
+  toolbar.classList.add('active');
+  updateStat();
+}
+
+function mini(t){
+  const b = document.createElement('button');
+  b.className = 'mini'; b.textContent = t;
+  return b;
+}
+
+function render(item){
+  const {img, canvas, h, v} = item;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(h ? canvas.width : 0, v ? canvas.height : 0);
+  ctx.scale(h ? -1 : 1, v ? -1 : 1);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+  item.hBtn.classList.toggle('on', h);
+  item.vBtn.classList.toggle('on', v);
+  item.stateEl.textContent =
+    h && v ? '左右・上下反転' : h ? '左右反転' : v ? '上下反転' : '';
+}
+
+function outName(item){
+  const tag = item.h && item.v ? '_flipHV' : item.h ? '_flipH' : item.v ? '_flipV' : '';
+  return `${item.baseName}${tag}.png`;
+}
+
+function toBlob(item){
+  return new Promise(res => item.canvas.toBlob(res, 'image/png'));
+}
+
+function updateStat(){
+  $('stat').innerHTML = `<b>${items.length}</b> 枚`;
+}
+
+$('allH').addEventListener('click', ()=>{ items.forEach(i=>{i.h=!i.h; render(i);}); });
+$('allV').addEventListener('click', ()=>{ items.forEach(i=>{i.v=!i.v; render(i);}); });
+$('allReset').addEventListener('click', ()=>{ items.forEach(i=>{i.h=false; i.v=false; render(i);}); });
+
+$('zipBtn').addEventListener('click', async ()=>{
+  if(!items.length) return;
+  const zip = new JSZip();
+  const used = new Set();
+  for(const item of items){
+    let name = outName(item), k = 2;
+    while(used.has(name)){ name = outName(item).replace(/\.png$/, `_${k}.png`); k++; }
+    used.add(name);
+    zip.file(name, await toBlob(item));
+  }
+  const blob = await zip.generateAsync({type:'blob'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'kagami.zip'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+});
+
+$('clearBtn').addEventListener('click', ()=>{
+  items = [];
+  grid.innerHTML = '';
+  toolbar.classList.remove('active');
+});
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>淵写 — Claudeログ変換</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --ink:#13151c;
+  --panel:#1b1e28;
+  --panel2:#222634;
+  --line:#2e3344;
+  --paper:#d9d6cb;
+  --muted:#7b8093;
+  --lantern:#e0a458;
+  --lantern-dim:#a97b3f;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink);color:var(--paper);font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;line-height:1.7}
+.wrap{max-width:880px;margin:0 auto;padding:48px 20px 96px}
+
+header{margin-bottom:36px}
+h1{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-weight:600;font-size:1.9rem;letter-spacing:.14em;color:var(--paper)}
+h1 .accent{color:var(--lantern)}
+.sub{color:var(--muted);font-size:.86rem;margin-top:8px;letter-spacing:.04em}
+
+/* ドロップゾーン */
+.drop{
+  border:1px dashed var(--line);
+  border-radius:10px;
+  background:var(--panel);
+  padding:44px 24px;
+  text-align:center;
+  cursor:pointer;
+  transition:border-color .2s, background .2s;
+}
+.drop:hover,.drop.over{border-color:var(--lantern-dim);background:var(--panel2)}
+.drop:focus-visible{outline:2px solid var(--lantern);outline-offset:2px}
+.drop .big{font-size:1.02rem;letter-spacing:.03em}
+.drop .small{color:var(--muted);font-size:.82rem;margin-top:6px}
+.drop input{display:none}
+
+/* 設定 */
+.opts{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;margin:26px 0 8px;padding:16px 18px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.opts label{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+.opts input[type=text]{
+  background:var(--ink);border:1px solid var(--line);border-radius:6px;
+  color:var(--paper);padding:5px 10px;font-size:.9rem;width:110px;
+}
+.opts input[type=text]:focus{outline:1px solid var(--lantern-dim);border-color:var(--lantern-dim)}
+.opts input[type=checkbox]{accent-color:var(--lantern);width:15px;height:15px}
+
+/* ツールバー */
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:20px 0 24px}
+.bar .count{color:var(--muted);font-size:.86rem;margin-left:auto}
+button{
+  font-family:inherit;font-size:.85rem;letter-spacing:.03em;
+  background:var(--panel2);color:var(--paper);
+  border:1px solid var(--line);border-radius:7px;
+  padding:8px 16px;cursor:pointer;transition:border-color .15s,color .15s;
+}
+button:hover{border-color:var(--lantern-dim);color:var(--lantern)}
+button:focus-visible{outline:2px solid var(--lantern);outline-offset:2px}
+button.primary{background:var(--lantern);color:var(--ink);border-color:var(--lantern);font-weight:600}
+button.primary:hover{background:#eab46b;color:var(--ink)}
+button.mini{padding:4px 11px;font-size:.78rem}
+
+/* チャットカード */
+.chat{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.chat-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:14px 18px;cursor:pointer}
+.chat-head:hover{background:var(--panel2)}
+.chat-title{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:1.02rem;letter-spacing:.02em;flex:1;min-width:200px}
+.chat-meta{color:var(--muted);font-size:.78rem;white-space:nowrap}
+.chat-actions{display:flex;gap:7px;padding:0 18px 14px;flex-wrap:wrap}
+.preview{
+  display:none;
+  border-top:1px solid var(--line);
+  background:var(--ink);
+  padding:18px 20px;
+  max-height:420px;overflow-y:auto;
+  font-size:.86rem;white-space:pre-wrap;word-break:break-word;
+  color:#c5c2b8;
+}
+.chat.open .preview{display:block}
+.preview::-webkit-scrollbar{width:8px}
+.preview::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(12px);
+  background:var(--lantern);color:var(--ink);font-size:.85rem;font-weight:600;
+  padding:9px 20px;border-radius:8px;opacity:0;pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.hidden{display:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>淵<span class="accent">写</span></h1>
+    <p class="sub">Claudeのエクスポート（conversations.json）を、Obsidian向けの静かなMarkdownに写す。</p>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="conversations.jsonを選択">
+    <div class="big">ここに conversations.json を置く</div>
+    <div class="small">クリックして選ぶこともできる ／ 何日分でもまとめて</div>
+    <input type="file" id="file" accept=".json,application/json">
+  </div>
+
+  <div class="opts hidden" id="opts">
+    <label>あなたの名前 <input type="text" id="nameHuman" value="夏樹"></label>
+    <label>相手の名前 <input type="text" id="nameAI" value="Claude"></label>
+    <label><input type="checkbox" id="boldNames" checked> 話者名を太字にする</label>
+    <label><input type="checkbox" id="hr"> 発言の間に区切り線（---）を入れる</label>
+  </div>
+
+  <div class="bar hidden" id="bar">
+    <button class="primary" id="zipAll">まとめてZIPで保存</button>
+    <button id="openAll">すべて開く</button>
+    <button id="closeAll">すべて閉じる</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div id="list"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let conversations = [];
+
+const $ = id => document.getElementById(id);
+const drop = $('drop'), fileInput = $('file');
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click();} });
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+fileInput.addEventListener('change', () => { if(fileInput.files[0]) readFile(fileInput.files[0]); });
+
+['nameHuman','nameAI','boldNames','hr'].forEach(id => $(id).addEventListener('input', render));
+$('openAll').addEventListener('click', () => document.querySelectorAll('.chat').forEach(c=>c.classList.add('open')));
+$('closeAll').addEventListener('click', () => document.querySelectorAll('.chat').forEach(c=>c.classList.remove('open')));
+$('zipAll').addEventListener('click', downloadZip);
+
+function readFile(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const json = JSON.parse(r.result);
+      conversations = parse(json);
+      render();
+      toast(`${conversations.length}件のチャットを読み込んだ`);
+    } catch(err) {
+      toast('JSONを読めなかった。エクスポートしたconversations.jsonか確認してみて');
+      console.error(err);
+    }
+  };
+  r.readAsText(file);
+}
+
+// UTC → 日本時間の日付文字列
+function jstDate(iso){
+  try {
+    const parts = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));
+    return parts; // YYYY-MM-DD
+  } catch(e){ return (iso||'').slice(0,10); }
+}
+
+function extractText(msg){
+  // contentのtextブロックだけを拾い、tool_use / tool_result / flag等のノイズは捨てる
+  if (Array.isArray(msg.content) && msg.content.length){
+    const t = msg.content
+      .filter(c => c && c.type === 'text' && typeof c.text === 'string' && c.text.trim())
+      .map(c => c.text.trim())
+      .join('\n\n');
+    if (t) return t;
+  }
+  return (typeof msg.text === 'string') ? msg.text.trim() : '';
+}
+
+function parse(json){
+  if (!Array.isArray(json)) throw new Error('unexpected format');
+  const convs = json.map(conv => {
+    const msgs = (conv.chat_messages || [])
+      .map(m => ({ sender: m.sender, text: extractText(m), ts: m.created_at || '' }))
+      .filter(m => m.text);
+    return {
+      title: (conv.name || '').trim() || '無題',
+      created: conv.created_at || '',
+      date: jstDate(conv.created_at),
+      msgs
+    };
+  }).filter(c => c.msgs.length);
+  convs.sort((a,b) => (a.created > b.created ? 1 : -1));
+  return convs;
+}
+
+function buildMarkdown(conv){
+  const nh = $('nameHuman').value.trim() || '夏樹';
+  const na = $('nameAI').value.trim() || 'Claude';
+  const bold = $('boldNames').checked;
+  const hr = $('hr').checked;
+  const label = s => {
+    const name = (s === 'human') ? nh : na;
+    return bold ? `**${name}：**` : `${name}：`;
+  };
+  const body = conv.msgs
+    .map(m => `${label(m.sender)}\n${m.text}`)
+    .join(hr ? '\n\n---\n\n' : '\n\n');
+  return `# ${conv.title}\n${conv.date}\n\n${body}\n`;
+}
+
+function safeName(s){
+  return s.replace(/[\\/:*?"<>|#^\[\]]/g,'').replace(/\s+/g,' ').trim().slice(0,60) || '無題';
+}
+
+function fileNameFor(conv, used){
+  let base = `${conv.date} ${safeName(conv.title)}`;
+  let name = base, i = 2;
+  while (used.has(name)) { name = `${base} (${i++})`; }
+  used.add(name);
+  return name + '.md';
+}
+
+function render(){
+  if (!conversations.length) return;
+  $('opts').classList.remove('hidden');
+  $('bar').classList.remove('hidden');
+  $('count').textContent = `${conversations.length}件 ／ ${conversations[0].date} 〜 ${conversations[conversations.length-1].date}`;
+
+  const list = $('list');
+  list.innerHTML = '';
+  conversations.forEach((conv, idx) => {
+    const md = buildMarkdown(conv);
+    const card = document.createElement('div');
+    card.className = 'chat';
+    card.innerHTML = `
+      <div class="chat-head" data-i="${idx}">
+        <span class="chat-title"></span>
+        <span class="chat-meta">${conv.date} ・ ${conv.msgs.length}発言</span>
+      </div>
+      <div class="chat-actions">
+        <button class="mini act-copy">コピー</button>
+        <button class="mini act-dl">.mdで保存</button>
+        <button class="mini act-toggle">プレビュー</button>
+      </div>
+      <pre class="preview"></pre>`;
+    card.querySelector('.chat-title').textContent = conv.title;
+    card.querySelector('.preview').textContent = md;
+    card.querySelector('.chat-head').addEventListener('click', () => card.classList.toggle('open'));
+    card.querySelector('.act-toggle').addEventListener('click', () => card.classList.toggle('open'));
+    card.querySelector('.act-copy').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(md); toast('コピーした'); }
+      catch(e){
+        const ta = document.createElement('textarea');
+        ta.value = md; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove(); toast('コピーした');
+      }
+    });
+    card.querySelector('.act-dl').addEventListener('click', () => {
+      const used = new Set();
+      downloadBlob(new Blob([md],{type:'text/markdown'}), fileNameFor(conv, used));
+    });
+    list.appendChild(card);
+  });
+}
+
+async function downloadZip(){
+  if (!conversations.length) return;
+  const zip = new JSZip();
+  const used = new Set();
+  conversations.forEach(conv => {
+    zip.file(fileNameFor(conv, used), buildMarkdown(conv));
+  });
+  const blob = await zip.generateAsync({type:'blob'});
+  const range = `${conversations[0].date}〜${conversations[conversations.length-1].date}`;
+  downloadBlob(blob, `Claudeログ ${range}.zip`);
+  toast('ZIPを保存した');
+}
+
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+let toastTimer;
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
