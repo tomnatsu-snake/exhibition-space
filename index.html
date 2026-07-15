@@ -68,6 +68,11 @@ border-bottom: none;
     image-rendering:auto;
     filter:drop-shadow(0 6px 16px rgba(62,88,71,.14));
     animation:float-in .9s ease both;
+        /* お持ち帰り対策：右クリック保存・長押し保存・ドラッグを効きにくく */	
+    pointer-events:none;	
+    user-select:none;	
+    -webkit-user-select:none;	
+    -webkit-touch-callout:none;
   }
 
   @keyframes float-in{
