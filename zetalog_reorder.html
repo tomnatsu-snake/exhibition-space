@@ -1,0 +1,201 @@
+
+<style>
+  :root{
+    --paper:   #FAFAF7;   /* 背景の白 */
+    --card:    #FFFFFF;   /* カードの白 */
+    --ink:     #363B37;   /* 文字色（濃いグレーグリーン） */
+    --grey:    #868D87;   /* 補助テキスト */
+    --line:    #E0E5DF;   /* 罫線 */
+    --green:   #56755F;   /* メインのグリーン */
+    --green-d: #3E5847;   /* 濃いグリーン */
+    --green-s: #ECF1EB;   /* 淡いグリーン（面） */
+    --radius:  14px;
+  }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+  body{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.8;
+    letter-spacing:.02em;
+    -webkit-font-smoothing:antialiased;
+    list-style-type: none;
+    text-decoration:none;
+  }
+.wrap { padding: 1.5rem 0; }
+h2.sr-only {font-size: 16px; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+.section-label { font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 8px; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+input[type="text"] { width: 100%; padding: 6px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-secondary); color: var(--color-text-primary); outline: none; transition: border-color 0.15s; }
+input[type="text"]:focus { border-color: var(--color-border-primary); }
+textarea { width: 100%; padding: 10px 12px; font-size: 13px; font-family: var(--font-mono); line-height: 1.6; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-secondary); color: var(--color-text-primary); resize: vertical; outline: none; transition: border-color 0.15s; }
+textarea:focus { border-color: var(--color-border-primary); }
+button { padding: 7px 16px; font-size: 13px; font-weight: 500; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: transparent; color: var(--color-text-primary); cursor: pointer; transition: background 0.1s, transform 0.08s; }
+button:hover { background: var(--color-background-secondary); }
+button:active { transform: scale(0.98); }
+.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+.hint { font-size: 12px; color: var(--color-text-tertiary); margin-top: 6px; line-height: 1.6; }
+.divider { height: 0.5px; background: var(--color-border-tertiary); margin: 10px 0; }
+.output-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); }
+.copy-btn { font-size: 12px; padding: 4px 12px; }
+.copy-btn.copied { color: var(--color-text-success); border-color: var(--color-border-success); }
+.char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+#error-msg { display: none; font-size: 13px; color: var(--color-text-danger); padding: 8px 12px; border: 0.5px solid var(--color-border-danger); border-radius: var(--border-radius-md); margin-top: 4px; }
+#debug-area { font-size: 11px; font-family: var(--font-mono); color: var(--color-text-secondary); margin-top: 8px; white-space: pre-wrap; }
+</style>
+
+<div class="wrap">
+<h2 class="sr-only">zetaチャットログ整形ツール </h2>
+<div class="card">
+<p class="section-label">zetaチャットログ整形ツール</p>
+  <p class="section-label">キャラクター設定</p>
+  <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px;">ユーザー名（まとまりの先頭になります）</p>
+  <input type="text" id="heroine" placeholder="例: User" />
+  <div class="divider"></div>
+  <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px;">他キャラ（最大5人、空欄OK）</p>
+  <div class="char-grid">
+    <input type="text" class="other-char" placeholder="例: キャラ1" />
+    <input type="text" class="other-char" placeholder="例: キャラ2" />
+    <input type="text" class="other-char" placeholder="キャラ3" />
+    <input type="text" class="other-char" placeholder="キャラ4" />
+    <input type="text" class="other-char" placeholder="キャラ5" />
+  </div>
+  <p class="hint">ナレーター行・登録外キャラはそのまま含まれます。</p>
+</div>
+<div class="card">
+  <p class="section-label">入力 — 逆順ログ（コピペしたチャット）を貼り付け</p>
+  <textarea id="input-area" rows="11" placeholder="ここにログを貼り付けてください…"></textarea>
+  <div class="btn-row">
+    <button onclick="processLog(false)">整える ↺</button>
+    <button onclick="processLog(true)">確認モード</button>
+    <button onclick="clearAll()">クリア</button>
+  </div>
+  <p class="hint">「確認モード」でまとまりの分割結果を出力下部に表示します。</p>
+<p>　</p>
+<p class="hint">2026.4.29時点でコピペしたログの形式にあわせて作りました。</p>
+<p class="hint">「Userに変身！」以降のチャットログに対応していますが、ナレーター行の順番はずれることがあります。</p>
+<p class="hint">イントロは別途コピペして付け足すと比較的綺麗にしあがります。</p>
+</div>
+<div class="card" id="output-card" style="display:none;">
+  <div class="output-header">
+    <p class="section-label" style="margin:0;">出力 — 正順</p>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge" id="block-count"></span>
+      <button class="copy-btn" onclick="copyOutput()">コピー</button>
+    </div>
+  </div>
+  <textarea id="output-area" rows="13" readonly></textarea>
+  <div id="debug-area"></div>
+</div>
+<div id="error-msg"></div>
+</div>
+
+<script>
+function splitIntoBlocks(text, allNames) {
+  const lines = text.split('\n');
+  const blocks = [];
+  let current = [];
+  function flush() {
+    const joined = current.join('\n').trim();
+    if (joined) blocks.push(joined);
+    current = [];
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) continue; // 空行は無視
+    const isName = allNames.length > 0 && allNames.some(n => t === n);
+    if (isName && current.length > 0) flush();
+    current.push(lines[i]);
+  }
+  flush();
+  return blocks;
+}
+
+function isHeroine(block, heroine) {
+  return block.split('\n')[0].trim() === heroine;
+}
+
+function processLog(debugMode) {
+  const errEl = document.getElementById('error-msg');
+  errEl.style.display = 'none';
+  document.getElementById('debug-area').textContent = '';
+
+  const raw = document.getElementById('input-area').value;
+  if (!raw.trim()) { showError('ログを貼り付けてください。'); return; }
+
+  const heroine = document.getElementById('heroine').value.trim();
+  if (!heroine) { showError('ユーザー名を入力してください。'); return; }
+
+  const others = Array.from(document.querySelectorAll('.other-char'))
+    .map(el => el.value.trim()).filter(Boolean);
+  const allNames = [heroine, ...others];
+
+  const blocks = splitIntoBlocks(raw, allNames);
+
+  // 末尾から走査：ユーザー名 + その直前ブロック群 = まとまり
+  const groups = [];
+  let pending = [];
+  let pendingHeroine = null;
+
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i];
+    if (isHeroine(b, heroine)) {
+      if (pendingHeroine !== null) {
+        groups.push([pendingHeroine, ...[...pending].reverse()]);
+        pending = [];
+      }
+      pendingHeroine = b;
+    } else {
+      pending.push(b);
+    }
+  }
+  if (pendingHeroine !== null) {
+    groups.push([pendingHeroine, ...[...pending].reverse()]);
+  }
+
+  if (groups.length === 0) {
+    showError('Userの発言ブロックが見つかりませんでした。キャラ名の表記を確認してください。');
+    return;
+  }
+
+  const output = groups.map(g => g.join('\n\n')).join('\n\n');
+  document.getElementById('output-area').value = output;
+  document.getElementById('block-count').textContent = `${groups.length} まとまり`;
+  document.getElementById('output-card').style.display = 'block';
+  const btn = document.querySelector('.copy-btn');
+  btn.textContent = 'コピー';
+  btn.classList.remove('copied');
+
+  if (debugMode) {
+    const dbg = groups.map((g, i) =>
+      `【まとまり${i+1}】\n` + g.map(b => '  ' + b.split('\n')[0].trim().slice(0, 40)).join('\n')
+    ).join('\n');
+    document.getElementById('debug-area').textContent = '\n--- 分割確認（出力順） ---\n' + dbg;
+  }
+}
+
+function copyOutput() {
+  const val = document.getElementById('output-area').value;
+  navigator.clipboard.writeText(val).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'コピーした！';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function clearAll() {
+  document.getElementById('input-area').value = '';
+  document.getElementById('output-area').value = '';
+  document.getElementById('output-card').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('debug-area').textContent = '';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
