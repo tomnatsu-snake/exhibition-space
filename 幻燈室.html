@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>幻燈室 — Magic Lantern Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0b0f0a;
+    --panel:#131a11;
+    --panel-2:#1a2416;
+    --brass:#c9a55c;
+    --brass-dim:#8a7340;
+    --candle:#e8b968;
+    --mist:#d8cfa8;
+    --mist-dim:#9a916f;
+    --line:rgba(201,165,92,.22);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{background:var(--ink)}
+  body{
+    min-height:100vh;
+    font-family:'Shippori Mincho',serif;
+    color:var(--mist);
+    background:
+      radial-gradient(ellipse 70% 50% at 80% 0%, rgba(232,185,104,.05), transparent 60%),
+      var(--ink);
+  }
+
+  /* ── 見出し ─────────────────────── */
+  header{
+    padding:34px 40px 22px;
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;
+  }
+  header h1{
+    font-size:26px;font-weight:600;letter-spacing:.42em;
+  }
+  header .en{
+    font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:14px;letter-spacing:.26em;color:var(--brass-dim);
+  }
+  header p{
+    width:100%;margin-top:10px;
+    font-size:12.5px;letter-spacing:.12em;color:var(--mist-dim);line-height:1.9;
+  }
+
+  main{
+    display:grid;grid-template-columns:minmax(320px,420px) 1fr;
+    gap:0;min-height:calc(100vh - 130px);
+  }
+  @media (max-width:900px){ main{grid-template-columns:1fr} }
+
+  /* ── 左：装填棚 ─────────────────── */
+  .loader{
+    border-right:1px solid var(--line);
+    padding:26px 28px 40px;
+  }
+  .sec-title{
+    font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:13px;letter-spacing:.3em;color:var(--brass);
+    margin-bottom:14px;
+  }
+
+  .drop{
+    border:1px dashed var(--brass-dim);
+    padding:34px 18px;text-align:center;cursor:pointer;
+    transition:border-color .3s ease, background .3s ease;
+    margin-bottom:22px;
+  }
+  .drop:hover,.drop.over{
+    border-color:var(--candle);
+    background:rgba(232,185,104,.05);
+  }
+  .drop .big{font-size:15px;letter-spacing:.22em;display:block;margin-bottom:8px}
+  .drop .small{font-size:11.5px;color:var(--mist-dim);letter-spacing:.1em}
+  #fileInput{display:none}
+
+  .plates{list-style:none;display:flex;flex-direction:column;gap:10px}
+  .plate{
+    display:grid;grid-template-columns:72px 1fr auto;gap:12px;
+    align-items:center;
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:10px;
+  }
+  .plate.dragging{opacity:.4}
+  .plate img{
+    width:72px;height:54px;object-fit:cover;display:block;
+    outline:1px solid rgba(201,165,92,.3);
+  }
+  .plate .meta{min-width:0}
+  .plate .cap{
+    width:100%;
+    background:transparent;border:none;border-bottom:1px solid rgba(201,165,92,.25);
+    color:var(--mist);font-family:'Shippori Mincho',serif;
+    font-size:13px;letter-spacing:.12em;padding:4px 2px;
+  }
+  .plate .cap::placeholder{color:var(--mist-dim);opacity:.6}
+  .plate .cap:focus{outline:none;border-bottom-color:var(--candle)}
+  .plate .ord{
+    font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:11px;color:var(--brass-dim);letter-spacing:.2em;
+    display:block;margin-top:5px;
+  }
+  .plate .btns{display:flex;flex-direction:column;gap:4px}
+  .pbtn{
+    background:transparent;border:1px solid transparent;
+    color:var(--brass-dim);cursor:pointer;
+    font-size:13px;line-height:1;padding:3px 6px;
+    transition:color .25s ease;
+  }
+  .pbtn:hover{color:var(--candle)}
+  .pbtn:focus-visible{outline:1px solid var(--candle)}
+
+  .empty-note{
+    font-size:12px;color:var(--mist-dim);letter-spacing:.1em;
+    line-height:2;padding:6px 2px;
+  }
+
+  /* ── 右：調光と上映 ─────────────── */
+  .board{padding:26px 34px 48px;display:flex;flex-direction:column;gap:30px}
+
+  .knobs{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:22px 30px}
+  .knob label{
+    display:block;font-size:12px;letter-spacing:.18em;
+    color:var(--mist-dim);margin-bottom:10px;
+  }
+  .knob .val{color:var(--candle);margin-left:8px;letter-spacing:.05em}
+  input[type=range]{
+    width:100%;-webkit-appearance:none;appearance:none;
+    height:2px;background:var(--brass-dim);outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;
+    width:13px;height:13px;transform:rotate(45deg);
+    background:var(--brass);cursor:pointer;
+    box-shadow:0 0 6px rgba(232,185,104,.5);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:13px;height:13px;transform:rotate(45deg);border:none;
+    background:var(--brass);cursor:pointer;
+  }
+
+  .toggles{display:flex;gap:26px;flex-wrap:wrap}
+  .tgl{
+    display:flex;align-items:center;gap:10px;cursor:pointer;
+    font-size:12.5px;letter-spacing:.16em;color:var(--mist-dim);
+    user-select:none;
+  }
+  .tgl input{display:none}
+  .tgl .mark{
+    width:11px;height:11px;transform:rotate(45deg);
+    border:1px solid var(--brass-dim);
+    transition:background .3s ease, box-shadow .3s ease;
+  }
+  .tgl input:checked + .mark{
+    background:var(--brass);
+    box-shadow:0 0 7px rgba(232,185,104,.55);
+  }
+  .tgl input:focus-visible + .mark{outline:2px solid var(--candle);outline-offset:3px}
+
+  .actions{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
+  .act{
+    font-family:'Shippori Mincho',serif;
+    font-size:14px;letter-spacing:.3em;
+    padding:13px 30px 13px 34px;
+    background:transparent;color:var(--mist);
+    border:1px solid var(--brass-dim);cursor:pointer;
+    transition:border-color .3s ease, color .3s ease, box-shadow .3s ease;
+  }
+  .act:hover:not(:disabled){
+    border-color:var(--candle);color:var(--candle);
+    box-shadow:0 0 16px rgba(232,185,104,.15);
+  }
+  .act:disabled{opacity:.35;cursor:default}
+  .act.primary{border-color:var(--brass);color:var(--candle)}
+  .hint{font-size:11.5px;color:var(--mist-dim);letter-spacing:.1em;line-height:1.9}
+
+  /* ── 上映オーバーレイ ───────────── */
+  #theatre{
+    position:fixed;inset:0;z-index:50;background:var(--ink);
+    display:none;align-items:center;justify-content:center;
+  }
+  #theatre.open{display:flex}
+  .t-frame{
+    position:relative;width:min(96vw, calc(96vh * var(--ar,1.3333)));
+    aspect-ratio:var(--ar,1.3333);
+    overflow:hidden;
+    outline:1px solid rgba(201,165,92,.28);outline-offset:-1px;
+    box-shadow:0 0 80px rgba(0,0,0,.9);
+  }
+  .t-frame::after{
+    content:'';position:absolute;inset:10px;
+    border:1px solid rgba(201,165,92,.2);pointer-events:none;z-index:6;
+  }
+  .t-slide{
+    position:absolute;inset:0;opacity:0;z-index:1;
+    transition:opacity var(--fade,2.6s) ease-in-out;
+  }
+  .t-slide.active{opacity:1;z-index:2}
+  .t-slide img{
+    width:100%;height:100%;object-fit:cover;
+    transform-origin:center;will-change:transform;
+  }
+  .t-candle{
+    position:absolute;inset:0;z-index:3;pointer-events:none;
+    background:
+      radial-gradient(ellipse 55% 45% at 78% 34%, rgba(232,185,104,.10), transparent 70%),
+      radial-gradient(ellipse 40% 50% at 8% 30%, rgba(232,185,104,.07), transparent 70%);
+    mix-blend-mode:screen;
+    animation:flicker 4.2s ease-in-out infinite;
+  }
+  @keyframes flicker{
+    0%{opacity:.75}9%{opacity:.95}17%{opacity:.68}26%{opacity:.88}
+    38%{opacity:.79}51%{opacity:1}63%{opacity:.72}74%{opacity:.9}
+    88%{opacity:.66}100%{opacity:.75}
+  }
+  .t-vig{
+    position:absolute;inset:0;z-index:4;pointer-events:none;
+    background:radial-gradient(ellipse 90% 85% at 50% 46%, transparent 55%, rgba(5,8,4,.55) 100%);
+  }
+  #t-motes{position:absolute;inset:0;z-index:5;pointer-events:none}
+  .t-caption{position:absolute;left:34px;bottom:30px;z-index:7;pointer-events:none}
+  .t-caption .num{
+    font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:15px;letter-spacing:.32em;color:var(--brass);
+    display:block;margin-bottom:6px;
+    opacity:0;transform:translateY(8px);
+    transition:opacity 1.8s ease .8s, transform 1.8s ease .8s;
+  }
+  .t-caption .line{
+    font-size:19px;font-weight:500;letter-spacing:.28em;color:var(--mist);
+    text-shadow:0 1px 14px rgba(0,0,0,.9);
+    opacity:0;transform:translateY(8px);
+    transition:opacity 1.8s ease 1.3s, transform 1.8s ease 1.3s;
+  }
+  .t-caption.show .num{opacity:.85;transform:none}
+  .t-caption.show .line{opacity:1;transform:none}
+  .t-controls{
+    position:absolute;right:30px;bottom:30px;z-index:8;
+    display:flex;align-items:center;gap:18px;
+  }
+  .t-dots{display:flex;gap:14px}
+  .t-dot{
+    width:9px;height:9px;transform:rotate(45deg);
+    border:1px solid var(--brass-dim);background:transparent;cursor:pointer;padding:0;
+    transition:background .6s ease, box-shadow .6s ease;
+  }
+  .t-dot.on{background:var(--brass);border-color:var(--brass);box-shadow:0 0 8px rgba(232,185,104,.55)}
+  .t-pp,.t-close{
+    background:transparent;border:none;cursor:pointer;
+    font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:13px;letter-spacing:.24em;color:var(--brass-dim);
+    transition:color .4s ease;
+  }
+  .t-pp:hover,.t-close:hover{color:var(--candle)}
+  .t-close{position:absolute;top:22px;right:26px;z-index:9;font-size:14px}
+
+  @media (max-width:640px){
+    header{padding:24px 20px 16px}
+    .loader,.board{padding:20px}
+    .t-caption{left:18px;bottom:60px}
+    .t-caption .line{font-size:15px;letter-spacing:.2em}
+    .t-controls{right:auto;left:18px;bottom:20px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .t-slide{transition:opacity 1.2s ease}
+    .t-slide img{animation:none !important}
+    .t-candle{animation:none;opacity:.8}
+    #t-motes{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>幻燈室</h1>
+  <span class="en">Magic Lantern Room</span>
+  <p>似た情景のイラストを装填し、ゆっくりとしたズームと蝋燭の灯りで一本の夜に仕立てる小さな映写機。仕上がりは単一のHTMLとして書き出せます。すべて手元で完結し、画像はどこにも送られません。</p>
+</header>
+
+<main>
+  <!-- 左：装填棚 -->
+  <section class="loader">
+    <div class="sec-title">Plates — 装填棚</div>
+    <div class="drop" id="drop" role="button" tabindex="0" aria-label="画像を追加">
+      <span class="big">画像をここへ</span>
+      <span class="small">ドラッグ＆ドロップ、またはクリックで選択（複数可）</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <ul class="plates" id="plates"></ul>
+    <p class="empty-note" id="emptyNote">まだ何も装填されていません。<br>2〜6枚くらいが、いちばん美しく巡ります。</p>
+  </section>
+
+  <!-- 右：調光盤 -->
+  <section class="board">
+    <div>
+      <div class="sec-title">Dial — 調光盤</div>
+      <div class="knobs">
+        <div class="knob">
+          <label>滞在時間 <span class="val" id="holdVal">11秒</span></label>
+          <input type="range" id="hold" min="5" max="25" step="1" value="11">
+        </div>
+        <div class="knob">
+          <label>転換の長さ <span class="val" id="fadeVal">2.6秒</span></label>
+          <input type="range" id="fade" min="1" max="5" step="0.2" value="2.6">
+        </div>
+        <div class="knob">
+          <label>ズームの深さ <span class="val" id="zoomVal">標準</span></label>
+          <input type="range" id="zoom" min="1" max="3" step="1" value="2">
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Air — 空気</div>
+      <div class="toggles">
+        <label class="tgl"><input type="checkbox" id="tglCandle" checked><span class="mark"></span>蝋燭の揺らぎ</label>
+        <label class="tgl"><input type="checkbox" id="tglMotes" checked><span class="mark"></span>金色の埃</label>
+        <label class="tgl"><input type="checkbox" id="tglNum" checked><span class="mark"></span>章番号（I. II. III.）</label>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Screening — 上映</div>
+      <div class="actions">
+        <button class="act primary" id="btnPlay" disabled>上映する</button>
+        <button class="act" id="btnExport" disabled>一冊に綴じて書き出す</button>
+      </div>
+      <p class="hint" style="margin-top:14px">
+        書き出したHTMLは画像ごと一枚に封じられ、単体で開けます。書架にそのまま並べられます。<br>
+        上映中は ← → で場面移動、スペースで一時停止、Esc で退室。
+      </p>
+    </div>
+  </section>
+</main>
+
+<!-- 上映室 -->
+<div id="theatre" aria-hidden="true">
+  <div class="t-frame" id="tFrame">
+    <div id="tSlides"></div>
+    <div class="t-candle" id="tCandle"></div>
+    <div class="t-vig"></div>
+    <canvas id="t-motes"></canvas>
+    <div class="t-caption" id="tCaption">
+      <span class="num" id="tCapNum"></span>
+      <span class="line" id="tCapLine"></span>
+    </div>
+    <div class="t-controls">
+      <div class="t-dots" id="tDots"></div>
+      <button class="t-pp" id="tPP">pause</button>
+    </div>
+    <button class="t-close" id="tClose">close ✕</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ============ 状態 ============ */
+  const plates = [];   // {id, dataUrl, caption, w, h}
+  let uid = 0;
+
+  const $ = s => document.querySelector(s);
+  const platesUl = $('#plates');
+  const emptyNote = $('#emptyNote');
+  const btnPlay = $('#btnPlay');
+  const btnExport = $('#btnExport');
+
+  const ROMAN = ['I.','II.','III.','IV.','V.','VI.','VII.','VIII.','IX.','X.','XI.','XII.'];
+
+  const KB_SETS = {
+    1:[ // 浅い
+      ['scale(1.01) translate(0.3%,0.2%)','scale(1.06) translate(-0.6%,-0.4%)'],
+      ['scale(1.02) translate(-0.5%,0.4%)','scale(1.08) translate(0.4%,-0.5%)'],
+      ['scale(1.07) translate(0.2%,-0.3%)','scale(1.01) translate(-0.2%,0.3%)'],
+    ],
+    2:[ // 標準
+      ['scale(1.02) translate(0.6%,0.4%)','scale(1.12) translate(-1.2%,-0.8%)'],
+      ['scale(1.04) translate(-1.0%,0.8%)','scale(1.16) translate(0.8%,-1.0%)'],
+      ['scale(1.14) translate(0.4%,-0.6%)','scale(1.03) translate(-0.4%,0.6%)'],
+    ],
+    3:[ // 深い
+      ['scale(1.03) translate(1.0%,0.7%)','scale(1.22) translate(-2.0%,-1.4%)'],
+      ['scale(1.06) translate(-1.6%,1.2%)','scale(1.26) translate(1.4%,-1.6%)'],
+      ['scale(1.24) translate(0.8%,-1.0%)','scale(1.04) translate(-0.7%,1.0%)'],
+    ],
+  };
+  const ZOOM_LABEL = {1:'浅く',2:'標準',3:'深く'};
+
+  /* ============ 装填 ============ */
+  const drop = $('#drop'), fileInput = $('#fileInput');
+  drop.addEventListener('click', ()=>fileInput.click());
+  drop.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click();} });
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop', e=>addFiles(e.dataTransfer.files));
+  fileInput.addEventListener('change', ()=>{ addFiles(fileInput.files); fileInput.value=''; });
+
+  function addFiles(fileList){
+    Array.from(fileList).filter(f=>f.type.startsWith('image/')).forEach(f=>{
+      const r = new FileReader();
+      r.onload = ()=>{
+        const img = new Image();
+        img.onload = ()=>{
+          plates.push({id:++uid, dataUrl:r.result, caption:'', w:img.naturalWidth, h:img.naturalHeight});
+          render();
+        };
+        img.src = r.result;
+      };
+      r.readAsDataURL(f);
+    });
+  }
+
+  function render(){
+    platesUl.innerHTML = '';
+    plates.forEach((p,i)=>{
+      const li = document.createElement('li');
+      li.className = 'plate';
+      li.draggable = true;
+      li.dataset.idx = i;
+
+      const img = document.createElement('img');
+      img.src = p.dataUrl; img.alt = '';
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const cap = document.createElement('input');
+      cap.className = 'cap'; cap.type = 'text';
+      cap.placeholder = '章題（空欄でも可）';
+      cap.value = p.caption;
+      cap.addEventListener('input', ()=>{ p.caption = cap.value; });
+      const ord = document.createElement('span');
+      ord.className = 'ord'; ord.textContent = ROMAN[i] || (i+1)+'.';
+      meta.append(cap, ord);
+
+      const btns = document.createElement('div');
+      btns.className = 'btns';
+      const up = mkBtn('▲','上へ', ()=>{ if(i>0){ [plates[i-1],plates[i]]=[plates[i],plates[i-1]]; render(); }});
+      const dn = mkBtn('▼','下へ', ()=>{ if(i<plates.length-1){ [plates[i+1],plates[i]]=[plates[i],plates[i+1]]; render(); }});
+      const rm = mkBtn('✕','外す', ()=>{ plates.splice(i,1); render(); });
+      btns.append(up,dn,rm);
+
+      // ドラッグ並べ替え
+      li.addEventListener('dragstart', ()=>{ li.classList.add('dragging'); li.dataset.drag='1'; });
+      li.addEventListener('dragend', ()=>{ li.classList.remove('dragging'); delete li.dataset.drag; });
+      li.addEventListener('dragover', e=>e.preventDefault());
+      li.addEventListener('drop', e=>{
+        e.preventDefault();
+        const from = Array.from(platesUl.children).findIndex(c=>c.dataset.drag);
+        const to = i;
+        if(from>-1 && from!==to){
+          const [m] = plates.splice(from,1);
+          plates.splice(to,0,m);
+          render();
+        }
+      });
+
+      li.append(img, meta, btns);
+      platesUl.appendChild(li);
+    });
+    emptyNote.style.display = plates.length ? 'none' : 'block';
+    btnPlay.disabled = btnExport.disabled = plates.length < 2;
+  }
+  function mkBtn(txt, label, fn){
+    const b = document.createElement('button');
+    b.className='pbtn'; b.textContent=txt; b.title=label; b.setAttribute('aria-label',label);
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  /* ============ 調光盤 ============ */
+  const hold=$('#hold'), fade=$('#fade'), zoom=$('#zoom');
+  hold.addEventListener('input', ()=>$('#holdVal').textContent = hold.value+'秒');
+  fade.addEventListener('input', ()=>$('#fadeVal').textContent = Number(fade.value).toFixed(1)+'秒');
+  zoom.addEventListener('input', ()=>$('#zoomVal').textContent = ZOOM_LABEL[zoom.value]);
+
+  function settings(){
+    return {
+      hold:Number(hold.value)*1000,
+      fade:Number(fade.value),
+      zoom:Number(zoom.value),
+      candle:$('#tglCandle').checked,
+      motes:$('#tglMotes').checked,
+      nums:$('#tglNum').checked,
+    };
+  }
+
+  /* ============ 上映 ============ */
+  const theatre=$('#theatre'), tFrame=$('#tFrame'), tSlides=$('#tSlides');
+  const tCaption=$('#tCaption'), tCapNum=$('#tCapNum'), tCapLine=$('#tCapLine');
+  const tDots=$('#tDots'), tPP=$('#tPP');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let idx=0, timer=null, playing=true, moteRAF=null, S=null, slideEls=[], dotEls=[];
+
+  btnPlay.addEventListener('click', openTheatre);
+  $('#tClose').addEventListener('click', closeTheatre);
+
+  function openTheatre(){
+    S = settings();
+    // アスペクト比：最初の1枚に合わせる
+    const ar = plates[0].w / plates[0].h;
+    tFrame.style.setProperty('--ar', ar.toFixed(4));
+    tFrame.style.setProperty('--fade', S.fade+'s');
+    $('#tCandle').style.display = S.candle ? '' : 'none';
+
+    tSlides.innerHTML=''; tDots.innerHTML='';
+    slideEls=[]; dotEls=[];
+    const kbSet = KB_SETS[S.zoom];
+    plates.forEach((p,i)=>{
+      const d = document.createElement('div');
+      d.className='t-slide';
+      const img = document.createElement('img');
+      img.src = p.dataUrl; img.alt = p.caption || '';
+      const kb = kbSet[i % kbSet.length];
+      img.dataset.from = kb[0]; img.dataset.to = kb[1];
+      d.appendChild(img);
+      tSlides.appendChild(d);
+      slideEls.push(d);
+
+      const dot = document.createElement('button');
+      dot.className='t-dot';
+      dot.setAttribute('aria-label', (ROMAN[i]||i+1) + ' ' + (p.caption||''));
+      dot.addEventListener('click', ()=>{ goTo(i); resetTimer(); });
+      tDots.appendChild(dot);
+      dotEls.push(dot);
+    });
+
+    playing = true; tPP.textContent='pause';
+    theatre.classList.add('open');
+    theatre.setAttribute('aria-hidden','false');
+    if(S.motes && !reduced) startMotes();
+    goTo(0); resetTimer();
+  }
+
+  function closeTheatre(){
+    theatre.classList.remove('open');
+    theatre.setAttribute('aria-hidden','true');
+    clearInterval(timer);
+    if(moteRAF) cancelAnimationFrame(moteRAF), moteRAF=null;
+  }
+
+  function animateKB(img){
+    if(reduced) return;
+    img.animate(
+      [{transform:img.dataset.from},{transform:img.dataset.to}],
+      {duration:S.hold + S.fade*1000 + 1500, easing:'ease-in-out', fill:'forwards'}
+    );
+  }
+
+  function goTo(i){
+    idx = (i + slideEls.length) % slideEls.length;
+    slideEls.forEach((s,k)=>{
+      const on = k===idx;
+      if(on && !s.classList.contains('active')) animateKB(s.querySelector('img'));
+      s.classList.toggle('active', on);
+    });
+    dotEls.forEach((d,k)=>d.classList.toggle('on', k===idx));
+    tCaption.classList.remove('show');
+    setTimeout(()=>{
+      const p = plates[idx];
+      tCapNum.textContent = S.nums ? (ROMAN[idx]||(idx+1)+'.') : '';
+      tCapLine.textContent = p.caption || '';
+      if(S.nums || p.caption) tCaption.classList.add('show');
+    }, 700);
+  }
+
+  function resetTimer(){
+    clearInterval(timer);
+    if(playing) timer = setInterval(()=>goTo(idx+1), S.hold);
+  }
+
+  tPP.addEventListener('click', ()=>{
+    playing = !playing;
+    tPP.textContent = playing ? 'pause' : 'play';
+    resetTimer();
+  });
+
+  document.addEventListener('keydown', e=>{
+    if(!theatre.classList.contains('open')) return;
+    if(e.key==='Escape') closeTheatre();
+    if(e.key==='ArrowRight'){ goTo(idx+1); resetTimer(); }
+    if(e.key==='ArrowLeft'){ goTo(idx-1); resetTimer(); }
+    if(e.key===' '){ e.preventDefault(); tPP.click(); }
+  });
+
+  /* 埃 */
+  function startMotes(){
+    const canvas = $('#t-motes');
+    const ctx = canvas.getContext('2d');
+    let W,H,motes=[];
+    function size(){
+      const r = canvas.getBoundingClientRect();
+      W = canvas.width = r.width * devicePixelRatio;
+      H = canvas.height = r.height * devicePixelRatio;
+    }
+    function spawn(n){
+      motes=[];
+      for(let i=0;i<n;i++) motes.push({
+        x:Math.random()*W, y:Math.random()*H,
+        r:(Math.random()*1.6+0.5)*devicePixelRatio,
+        vy:-(Math.random()*0.16+0.05)*devicePixelRatio,
+        vx:(Math.random()-0.5)*0.10*devicePixelRatio,
+        ph:Math.random()*Math.PI*2,
+        sp:Math.random()*0.008+0.003,
+        a:Math.random()*0.35+0.12
+      });
+    }
+    size(); spawn(46);
+    function tick(){
+      if(!theatre.classList.contains('open')){ moteRAF=null; return; }
+      ctx.clearRect(0,0,W,H);
+      for(const m of motes){
+        m.ph += m.sp;
+        m.x += m.vx + Math.sin(m.ph)*0.12*devicePixelRatio;
+        m.y += m.vy;
+        if(m.y < -6){ m.y = H+6; m.x = Math.random()*W; }
+        const tw = m.a*(0.6+0.4*Math.sin(m.ph*3));
+        ctx.beginPath();
+        ctx.arc(m.x,m.y,m.r,0,Math.PI*2);
+        ctx.fillStyle='rgba(232,185,104,'+tw.toFixed(3)+')';
+        ctx.shadowColor='rgba(232,185,104,0.7)';
+        ctx.shadowBlur=5*devicePixelRatio;
+        ctx.fill(); ctx.shadowBlur=0;
+      }
+      moteRAF = requestAnimationFrame(tick);
+    }
+    moteRAF = requestAnimationFrame(tick);
+  }
+
+  /* ============ 書き出し ============ */
+  btnExport.addEventListener('click', ()=>{
+    const s = settings();
+    const html = buildStandalone(plates, s);
+    const blob = new Blob([html], {type:'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '幻燈_' + new Date().toISOString().slice(0,10) + '.html';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  });
+
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function buildStandalone(pl, s){
+    const ar = (pl[0].w/pl[0].h).toFixed(4);
+    const kbSet = KB_SETS[s.zoom];
+    const slidesHtml = pl.map((p,i)=>{
+      const kb = kbSet[i%kbSet.length];
+      return '<div class="slide"><img src="'+p.dataUrl+'" alt="'+esc(p.caption)+'" data-from="'+kb[0]+'" data-to="'+kb[1]+'"></div>';
+    }).join('\n');
+    const scenes = JSON.stringify(pl.map((p,i)=>({num: s.nums ? (ROMAN[i]||(i+1)+'.') : '', line:p.caption||''})));
+
+    return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>幻燈</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0b0f0a;--brass:#c9a55c;--brass-dim:#8a7340;--candle:#e8b968;--mist:#d8cfa8}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--ink);overflow:hidden}
+body{font-family:'Shippori Mincho',serif;color:var(--mist);display:flex;align-items:center;justify-content:center}
+.frame{position:relative;width:min(96vw,calc(96vh * ${ar}));aspect-ratio:${ar};overflow:hidden;outline:1px solid rgba(201,165,92,.28);outline-offset:-1px;box-shadow:0 0 80px rgba(0,0,0,.9)}
+.frame::after{content:'';position:absolute;inset:10px;border:1px solid rgba(201,165,92,.2);pointer-events:none;z-index:6}
+.slide{position:absolute;inset:0;opacity:0;z-index:1;transition:opacity ${s.fade}s ease-in-out}
+.slide.active{opacity:1;z-index:2}
+.slide img{width:100%;height:100%;object-fit:cover;transform-origin:center;will-change:transform}
+${s.candle ? `.candle{position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse 55% 45% at 78% 34%,rgba(232,185,104,.10),transparent 70%),radial-gradient(ellipse 40% 50% at 8% 30%,rgba(232,185,104,.07),transparent 70%);mix-blend-mode:screen;animation:flicker 4.2s ease-in-out infinite}
+@keyframes flicker{0%{opacity:.75}9%{opacity:.95}17%{opacity:.68}26%{opacity:.88}38%{opacity:.79}51%{opacity:1}63%{opacity:.72}74%{opacity:.9}88%{opacity:.66}100%{opacity:.75}}` : ''}
+.vig{position:absolute;inset:0;z-index:4;pointer-events:none;background:radial-gradient(ellipse 90% 85% at 50% 46%,transparent 55%,rgba(5,8,4,.55) 100%)}
+#motes{position:absolute;inset:0;z-index:5;pointer-events:none}
+.caption{position:absolute;left:34px;bottom:30px;z-index:7;pointer-events:none}
+.caption .num{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;letter-spacing:.32em;color:var(--brass);display:block;margin-bottom:6px;opacity:0;transform:translateY(8px);transition:opacity 1.8s ease .8s,transform 1.8s ease .8s}
+.caption .line{font-size:19px;font-weight:500;letter-spacing:.28em;color:var(--mist);text-shadow:0 1px 14px rgba(0,0,0,.9);opacity:0;transform:translateY(8px);transition:opacity 1.8s ease 1.3s,transform 1.8s ease 1.3s}
+.caption.show .num{opacity:.85;transform:none}
+.caption.show .line{opacity:1;transform:none}
+.controls{position:absolute;right:30px;bottom:30px;z-index:8;display:flex;align-items:center;gap:18px}
+.dots{display:flex;gap:14px}
+.dot{width:9px;height:9px;transform:rotate(45deg);border:1px solid var(--brass-dim);background:transparent;cursor:pointer;padding:0;transition:background .6s ease,box-shadow .6s ease}
+.dot.on{background:var(--brass);border-color:var(--brass);box-shadow:0 0 8px rgba(232,185,104,.55)}
+.pp{background:transparent;border:none;cursor:pointer;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;letter-spacing:.24em;color:var(--brass-dim);transition:color .4s ease}
+.pp:hover{color:var(--candle)}
+.frame::before{content:'';position:absolute;inset:0;z-index:9;background:var(--ink);pointer-events:none;animation:curtain 3s ease .4s forwards}
+@keyframes curtain{to{opacity:0;visibility:hidden}}
+@media (max-width:640px){.caption{left:18px;bottom:60px}.caption .line{font-size:15px;letter-spacing:.2em}.controls{right:auto;left:18px;bottom:20px}}
+@media (prefers-reduced-motion:reduce){.slide{transition:opacity 1.2s ease}.slide img{animation:none!important}${s.candle?'.candle{animation:none;opacity:.8}':''}#motes{display:none}}
+</style>
+</head>
+<body>
+<div class="frame">
+${slidesHtml}
+${s.candle ? '<div class="candle"></div>' : ''}
+<div class="vig"></div>
+<canvas id="motes"></canvas>
+<div class="caption" id="caption"><span class="num" id="capNum"></span><span class="line" id="capLine"></span></div>
+<div class="controls"><div class="dots" id="dots"></div><button class="pp" id="pp">pause</button></div>
+</div>
+<script>
+(function(){
+var SCENES=${scenes};
+var HOLD=${s.hold};var FADE=${s.fade*1000};var MOTES=${s.motes};
+var slides=Array.prototype.slice.call(document.querySelectorAll('.slide'));
+var caption=document.getElementById('caption'),capNum=document.getElementById('capNum'),capLine=document.getElementById('capLine');
+var dotsWrap=document.getElementById('dots'),pp=document.getElementById('pp');
+var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var idx=0,timer=null,playing=true;
+var dots=SCENES.map(function(sc,i){
+  var b=document.createElement('button');b.className='dot';
+  b.setAttribute('aria-label',(sc.num||'')+' '+(sc.line||''));
+  b.addEventListener('click',function(){goTo(i);resetTimer();});
+  dotsWrap.appendChild(b);return b;
+});
+function kb(img){
+  if(reduced)return;
+  img.animate([{transform:img.dataset.from},{transform:img.dataset.to}],{duration:HOLD+FADE+1500,easing:'ease-in-out',fill:'forwards'});
+}
+function goTo(i){
+  idx=(i+slides.length)%slides.length;
+  slides.forEach(function(sl,k){
+    var on=k===idx;
+    if(on&&!sl.classList.contains('active'))kb(sl.querySelector('img'));
+    sl.classList.toggle('active',on);
+  });
+  dots.forEach(function(d,k){d.classList.toggle('on',k===idx);});
+  caption.classList.remove('show');
+  setTimeout(function(){
+    capNum.textContent=SCENES[idx].num;capLine.textContent=SCENES[idx].line;
+    if(SCENES[idx].num||SCENES[idx].line)caption.classList.add('show');
+  },700);
+}
+function resetTimer(){clearInterval(timer);if(playing)timer=setInterval(function(){goTo(idx+1);},HOLD);}
+pp.addEventListener('click',function(){playing=!playing;pp.textContent=playing?'pause':'play';resetTimer();});
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowRight'){goTo(idx+1);resetTimer();}
+  if(e.key==='ArrowLeft'){goTo(idx-1);resetTimer();}
+  if(e.key===' '){e.preventDefault();pp.click();}
+});
+if(MOTES&&!reduced){
+  var canvas=document.getElementById('motes'),ctx=canvas.getContext('2d'),W,H,motes=[];
+  function size(){var r=canvas.getBoundingClientRect();W=canvas.width=r.width*devicePixelRatio;H=canvas.height=r.height*devicePixelRatio;}
+  function spawn(n){motes=[];for(var i=0;i<n;i++)motes.push({x:Math.random()*W,y:Math.random()*H,r:(Math.random()*1.6+0.5)*devicePixelRatio,vy:-(Math.random()*0.16+0.05)*devicePixelRatio,vx:(Math.random()-0.5)*0.10*devicePixelRatio,ph:Math.random()*Math.PI*2,sp:Math.random()*0.008+0.003,a:Math.random()*0.35+0.12});}
+  size();spawn(46);
+  window.addEventListener('resize',function(){size();spawn(46);});
+  (function tick(){
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<motes.length;i++){var m=motes[i];
+      m.ph+=m.sp;m.x+=m.vx+Math.sin(m.ph)*0.12*devicePixelRatio;m.y+=m.vy;
+      if(m.y<-6){m.y=H+6;m.x=Math.random()*W;}
+      var tw=m.a*(0.6+0.4*Math.sin(m.ph*3));
+      ctx.beginPath();ctx.arc(m.x,m.y,m.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(232,185,104,'+tw.toFixed(3)+')';
+      ctx.shadowColor='rgba(232,185,104,0.7)';ctx.shadowBlur=5*devicePixelRatio;
+      ctx.fill();ctx.shadowBlur=0;
+    }
+    requestAnimationFrame(tick);
+  })();
+}
+goTo(0);resetTimer();
+})();
+<\/script>
+</body>
+</html>`;
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
