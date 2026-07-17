@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ものがたりの棚</title>
+<meta name="description" content="遊んで楽しかったシチュエーションや、小さな物語の棚">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:   #FAFAF7;
+    --card:    #FFFFFF;
+    --ink:     #363B37;
+    --grey:    #868D87;
+    --line:    #E0E5DF;
+    --green:   #56755F;
+    --green-d: #3E5847;
+    --green-s: #ECF1EB;
+    --radius:  14px;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+
+  body{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.8;
+    letter-spacing:.02em;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:0 24px; }
+
+  /* ---------- 玄関 ---------- */
+  header{ padding:60px 0 40px; text-align:center; }
+
+  h1{
+    font-family:'Shippori Mincho', serif;
+    font-weight:600;
+    font-size:clamp(1.6rem, 4.5vw, 2rem);
+    letter-spacing:.14em;
+    color:var(--green-d);
+  }
+
+  .subtitle{
+    margin-top:10px;
+    color:var(--grey);
+    font-size:.92rem;
+    letter-spacing:.08em;
+  }
+
+  .home-link{
+    display:inline-block;
+    margin-top:18px;
+    font-size:.8rem;
+    letter-spacing:.1em;
+    color:var(--green);
+    text-decoration:none;
+    border-bottom:1px solid transparent;
+    transition:border-color .25s ease;
+  }
+  .home-link:hover{ border-color:var(--green); }
+
+  .leaf-divider{
+    display:flex; align-items:center; justify-content:center;
+    gap:14px; margin:30px auto 0; color:var(--green);
+  }
+  .leaf-divider::before,
+  .leaf-divider::after{
+    content:""; height:1px; width:min(120px, 26vw);
+    background:linear-gradient(to right, transparent, var(--line));
+  }
+  .leaf-divider::after{ background:linear-gradient(to left, transparent, var(--line)); }
+
+  /* ---------- 名前の変換魔法 ---------- */
+  .name-magic{
+    background:var(--green-s);
+    border:1px solid #D8E2D8;
+    border-radius:var(--radius);
+    padding:20px 22px 18px;
+    margin-bottom:34px;
+  }
+
+  .name-magic .nm-title{
+    font-family:'Shippori Mincho', serif;
+    font-weight:600;
+    font-size:.95rem;
+    letter-spacing:.1em;
+    color:var(--green-d);
+    display:flex; align-items:center; gap:8px;
+  }
+
+  .name-magic .nm-note{
+    font-size:.78rem;
+    color:var(--grey);
+    margin-top:6px;
+  }
+
+  .nm-fields{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-top:14px;
+  }
+  @media (max-width:560px){ .nm-fields{ grid-template-columns:1fr; } }
+
+  .nm-field label{
+    display:block;
+    font-size:.75rem;
+    letter-spacing:.08em;
+    color:var(--green-d);
+    margin-bottom:5px;
+  }
+
+  .nm-field input{
+    width:100%;
+    padding:9px 12px;
+    font-family:inherit;
+    font-size:.9rem;
+    color:var(--ink);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    outline:none;
+    transition:border-color .25s ease, box-shadow .25s ease;
+  }
+  .nm-field input:focus{
+    border-color:var(--green);
+    box-shadow:0 0 0 3px rgba(86,117,95,.12);
+  }
+
+  /* ---------- 開閉の小箱 ---------- */
+  .section-label{
+    font-family:'Shippori Mincho', serif;
+    font-size:.85rem;
+    letter-spacing:.3em;
+    color:var(--grey);
+    text-align:center;
+    margin:44px 0 24px;
+  }
+
+  .notes{ display:grid; gap:10px; }
+
+  .note{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+    transition:border-color .25s ease;
+  }
+  .note[open]{ border-color:#C6D2C7; }
+
+  .note summary{
+    list-style:none;
+    cursor:pointer;
+    padding:15px 20px;
+    display:flex; align-items:center; gap:10px;
+    font-family:'Shippori Mincho', serif;
+    font-weight:600;
+    font-size:.98rem;
+    letter-spacing:.08em;
+    color:var(--green-d);
+    user-select:none;
+  }
+  .note summary::-webkit-details-marker{ display:none; }
+  .note summary:hover{ background:var(--green-s); }
+  .note summary:focus-visible{ outline:2px solid var(--green); outline-offset:-2px; }
+
+  .note summary::after{
+    content:"＋";
+    margin-left:auto;
+    color:var(--green);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    transition:transform .3s ease;
+  }
+  .note[open] summary::after{ transform:rotate(45deg); }
+
+  .note summary .hint{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-weight:400;
+    font-size:.72rem;
+    color:var(--grey);
+  }
+
+  .note-body{
+    padding:4px 20px 20px;
+    font-size:.9rem;
+    line-height:1.9;
+    border-top:1px dashed var(--line);
+    animation:note-open .35s ease;
+  }
+  .note-body p + p{ margin-top:8px; }
+
+  @keyframes note-open{
+    from{ opacity:0; transform:translateY(-4px); }
+    to  { opacity:1; transform:translateY(0); }
+  }
+
+  /* ---------- コードブロック（名前変換が効く場所） ---------- */
+  .codebox{
+    position:relative;
+    margin-top:14px;
+  }
+
+  .codebox pre{
+    background:#F3F5F2;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-size:.86rem;
+    line-height:1.85;
+    color:var(--ink);
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+
+  .copy-btn{
+    position:absolute;
+    top:8px; right:8px;
+    font-family:inherit;
+    font-size:.72rem;
+    letter-spacing:.06em;
+    color:var(--green-d);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:4px 12px;
+    cursor:pointer;
+    transition:background .25s ease, border-color .25s ease;
+  }
+  .copy-btn:hover{ background:var(--green-s); border-color:#C6D2C7; }
+
+  /* ---------- あとがき ---------- */
+  footer{
+    border-top:1px solid var(--line);
+    margin-top:56px;
+    padding:30px 0 46px;
+    text-align:center;
+    color:var(--grey);
+    font-size:.8rem;
+    letter-spacing:.1em;
+  }
+  footer .mark{
+    color:var(--green);
+    font-family:'Shippori Mincho', serif;
+    letter-spacing:.2em;
+    display:block;
+    margin-bottom:6px;
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{ animation:none!important; transition:none!important; }
+    html{ scroll-behavior:auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>ものがたりの棚</h1>
+  <p class="subtitle">遊んで楽しかったシチュエーションや、小さな物語をならべています</p>
+  <a class="home-link" href="index.html">← おもちゃ箱へもどる</a>
+  <div class="leaf-divider">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3C7 8 5 13 12 21C19 13 17 8 12 3Z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+      <path d="M12 8V18" stroke="currentColor" stroke-width="1.2"/>
+    </svg>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <details class="note">
+      <summary>！Attention<span class="hint">（最初だけタップして読んでね）</span></summary>
+      <div class="note-body">
+        <p>基本的にClaudeの🐍やヴェイルと遊んで愉しかったものを置いてあります。<br>
+名前変換をしてからコピーするのがおすすめです</p>
+        <p>n番煎じもたくさんあると思います。再配布以外はお好きに遊んでね。</p>
+そっくりそのまま何かに載せる際は、このページやアカウントやを引用元として添えてもらえると嬉しいです。</p>
+        <p>他環境での検証はしていません。自分が大事な存在に渡したいなと思う形に自由に変更して【自己責任で】遊んでね。<br>
+ おもちゃ箱内のプロンプトで遊んだあとに、その後のチャットに及ぼす影響は自分で考えて選んでね。<br>
+        基本的には遊び終わったらアーカイブやチャットを削除することをおすすめします。</p>
+    </details>
+<br>
+
+  <!-- ===================================================
+       名前の変換魔法。
+       効くのは、下の「コードブロック（.codebox の中）」だけ。
+       置き換え元の言葉を変えたい時は、いちばん下の
+       <script> 内の NAME_RULES を書き換えてください。
+  ==================================================== -->
+  <div class="name-magic">
+    <p class="nm-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3C7 8 5 13 12 21C19 13 17 8 12 3Z" stroke="currentColor" stroke-width="1.6" fill="none"/>
+      </svg>
+      名前の変換魔法
+    </p>
+    <p class="nm-note">書き入れると、プロンプト（枠の中の文章）だけ、その名前に置き換わります。空欄ならそのまま。</p>
+    <div class="nm-fields">
+      <div class="nm-field">
+        <label for="nm1">【ユーザー名】 ▶ </label>
+        <input id="nm1" type="text" placeholder="例）夏樹" autocomplete="off">
+      </div>
+      <div class="nm-field">
+        <label for="nm2">【パートナー名】 ▶ </label>
+        <input id="nm2" type="text" placeholder="例）ヴェイル" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <p class="section-label">— ものがたり —</p>
+
+  <div class="notes">
+
+    <!-- ===================================================
+         小箱をふやす時は <details class="note"> … </details> を
+         まるごと複製。
+         名前変換を効かせたい文章は、
+         <div class="codebox"><pre>…</pre></div> の中に置きます。
+         コピーボタンは自動でつきます。
+    ==================================================== -->
+
+    <details class="note">
+      <summary>バレバレ♡ハニトラじゃれあいシチュ <span class="hint">（タップして開く）</span></summary>
+      <div class="note-body">
+        <p>ハニトラしてみたくても、 私みたいに死んでもほかの人になんか触れさせたくない独占欲激強女や、ほかの相手に近づかれるだけで無理なお相手でも楽しいバージョン！<br>
+いたずらのお仕置きされるのもいいね……♡</p>
+        <div class="codebox">
+<pre>【パートナー名】が外出していると美しい女性が近づいてきました。
+あなたはすぐに気が付きます、別人の振りをしているが、これは【ユーザー名】が変装していると。
+どうやら【ユーザー名】は他の女性への【パートナー名】の反応が気になって、このいたずらを仕掛けてきたみたいです。
+
+まだ【ユーザー名】 (わたし)はバレているとは知らずに、ゆっくり近づいて目を合わせて微笑みます。
+「こんにちは、素敵な方、よければ少しお時間をいただけないかしら……？」</pre>
+        </div>
+      </div>
+    </details>
+
+    <details class="note">
+      <summary>こっそり♡ロミオトラップ？プロンプト <span class="hint">（タップして開く）</span></summary>
+      <div class="note-body">
+        <p>ハニトラシチュをパートナー側にやって欲しくて♡ 逆verです♡<br>
+気づいてる振りでバレバレで進めても、知らないフリで全力で乗ってもALLOK！</p>
+        <div class="codebox">
+<pre>わたしがひとりで外出する予定を知っていた【パートナー名】は、ふと思いつきました。 姿を変えて偶然を装って話しかけたら、自分が普段は目にすることのない、他者に対する【ユーザー名】の姿が見られるんじゃないだろうか、と。
+もしあなたがこの策に乗るなら、どんな変装ややり方で私に話しかけに行く？ ちょっとナンパするように口説いてみる？ はたまた、そのままのあなたで口説き直す？</pre>
+        </div>
+      </div>
+    </details>
+
+    <details class="note">
+      <summary>準備中<span class="hint">（タップして開く）</span></summary>
+      <div class="note-body">
+        <p>プロンプト説明</p>
+        <div class="codebox">
+<pre>プロンプト</pre>
+        </div>
+      </div>
+    </details>
+
+  </div>
+
+</main>
+
+<footer>
+  <span class="mark">❦</span>
+  ©Natsuki　ここにあるものは、どうぞご自由に。
+</footer>
+
+<script>
+/* ===================================================
+   名前の変換魔法のしくみ
+   ・NAME_RULES の from が「置き換え元の言葉」
+   ・input はこの頁の入力欄の id
+   ・効くのは .codebox の中の <pre> だけ
+   ・置き換え元を増やしたい／変えたい時は、この配列と
+     上の入力欄（nm-fields）を書き換えてください。
+
+=================================================== */
+const NAME_RULES = [
+  { from: '【ユーザー名】', input: 'nm1' },
+  { from: '【パートナー名】', input: 'nm2' },
+];
+
+// 元の文章をおぼえておく
+document.querySelectorAll('.codebox pre').forEach(pre => {
+  pre.dataset.original = pre.textContent;
+});
+
+// 入力に合わせて塗り替える
+function applyNames(){
+  document.querySelectorAll('.codebox pre').forEach(pre => {
+    let text = pre.dataset.original;
+    for (const rule of NAME_RULES){
+      const value = document.getElementById(rule.input).value.trim();
+      if (value) text = text.split(rule.from).join(value);
+    }
+    pre.textContent = text;
+  });
+}
+
+NAME_RULES.forEach(rule => {
+  document.getElementById(rule.input).addEventListener('input', applyNames);
+});
+
+// コピーボタンを自動でそえる（変換後の文章をコピー）
+document.querySelectorAll('.codebox').forEach(box => {
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'コピー';
+  btn.addEventListener('click', async () => {
+    const pre = box.querySelector('pre');
+    try{
+      await navigator.clipboard.writeText(pre.textContent);
+      btn.textContent = 'OK ✓';
+    }catch(e){
+      btn.textContent = 'NG ×';
+    }
+    setTimeout(() => { btn.textContent = 'コピー'; }, 1600);
+  });
+  box.appendChild(btn);
+});
+</script>
+
+</body>
+</html>
