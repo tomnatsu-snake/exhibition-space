@@ -310,6 +310,12 @@
       <div class="nm-field">
         <label for="nm2">【パートナー名】 ▶ </label>
         <input id="nm2" type="text" placeholder="例）ヴェイル" autocomplete="off">
+              <div class="nm-field">
+        <label for="nm3">わたし（一人称） ▶ </label>
+        <input id="nm3" type="text" placeholder="例）私" autocomplete="off">
+        <div class="nm-field">
+        <label for="nm4">あなた（二人称） ▶ </label>
+        <input id="nm4" type="text" placeholder="例）君" autocomplete="off">
       </div>
     </div>
   </div>
@@ -386,6 +392,8 @@
 const NAME_RULES = [
   { from: '【ユーザー名】', input: 'nm1' },
   { from: '【パートナー名】', input: 'nm2' },
+  { from: 'わたし', input: 'nm3' },
+  { from: 'あなた', input: 'nm4' },
 ];
 
 // 元の文章をおぼえておく
