@@ -171,6 +171,30 @@
     color:#fff;
   }
 
+  .file-drop{
+    margin-top:.65rem;
+    padding:1rem;
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+    background:var(--card);
+    color:var(--grey);
+    text-align:center;
+    font-size:.82rem;
+    cursor:pointer;
+    transition:border-color .2s,background .2s,color .2s;
+  }
+
+  .file-drop:hover,
+  .file-drop.dragover{
+    border-color:var(--green);
+    background:var(--green-s);
+    color:var(--green-d);
+  }
+
+  .file-drop strong{ color:var(--green-d); font-weight:500; }
+  .file-drop input{ display:none; }
+  .file-name{ margin-top:.35rem; font-size:.75rem; }
+
   .actions{
     display:flex;
     gap:.75rem;
@@ -222,6 +246,11 @@
   <div>
     <div class="section-label">ログを貼り付け</div>
     <textarea id="input" rows="10" placeholder="User:&#10;7/7/2026 1:21:18&#10;テキストをここに……"></textarea>
+    <label class="file-drop" id="file-drop">
+      <input type="file" id="file-input" accept=".md,.markdown,text/markdown,text/plain">
+      <strong>Markdownファイルを選ぶ</strong>、またはここへドロップ
+      <div class="file-name" id="file-name">.md / .markdown / .txt に対応</div>
+    </label>
   </div>
 
   <div class="actions">
@@ -251,6 +280,57 @@
   const outputSection = document.getElementById('output-section');
   const formatBtn = document.getElementById('format-btn');
   const copyBtn = document.getElementById('copy-btn');
+  const fileInput = document.getElementById('file-input');
+  const fileDrop = document.getElementById('file-drop');
+  const fileName = document.getElementById('file-name');
+
+
+
+  function isSupportedFile(file){
+    const name = file.name.toLowerCase();
+    return name.endsWith('.md') || name.endsWith('.markdown') || name.endsWith('.txt');
+  }
+
+  function loadFile(file){
+    if(!file) return;
+    if(!isSupportedFile(file)){
+      fileName.textContent = '対応しているファイルは .md / .markdown / .txt です';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      inputEl.value = String(reader.result || '');
+      fileName.textContent = file.name + ' を読み込みました';
+      outputSection.style.display = 'none';
+    };
+    reader.onerror = () => {
+      fileName.textContent = 'ファイルを読み込めませんでした';
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  fileInput.addEventListener('change', () => {
+    loadFile(fileInput.files?.[0]);
+  });
+
+  ['dragenter', 'dragover'].forEach(type => {
+    fileDrop.addEventListener(type, event => {
+      event.preventDefault();
+      fileDrop.classList.add('dragover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(type => {
+    fileDrop.addEventListener(type, event => {
+      event.preventDefault();
+      fileDrop.classList.remove('dragover');
+    });
+  });
+
+  fileDrop.addEventListener('drop', event => {
+    loadFile(event.dataTransfer?.files?.[0]);
+  });
 
   function createNameSetting(speaker, defaultName){
     const settingEl = document.querySelector(`[data-speaker="${speaker}"]`);
