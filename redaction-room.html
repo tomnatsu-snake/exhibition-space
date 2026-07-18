@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>墨消しの間 — Redaction Room</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
+<style>
+  :root{
+    --ink:#1a181c;          /* 墨 */
+    --panel:#242029;
+    --panel2:#2c2731;
+    --paper:#ddd6c8;        /* 生成り */
+    --paper-dim:#9b948a;
+    --seal:#a83c32;         /* 印泥の朱 */
+    --gold:#c9a862;         /* 箔押し */
+    --line:#3a3440;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:860px;margin:0 auto}
+  header{margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:16px}
+  .eyebrow{
+    font-size:11px;letter-spacing:.35em;color:var(--gold);
+    text-transform:uppercase;margin-bottom:6px;
+  }
+  h1{
+    font-family:"Hiragino Mincho ProN","Yu Mincho",Georgia,serif;
+    font-weight:600;font-size:26px;letter-spacing:.12em;
+  }
+  h1 .redact{
+    background:var(--paper);color:var(--paper);
+    border-radius:2px;padding:0 4px;margin-left:10px;
+    font-size:15px;letter-spacing:.2em;vertical-align:middle;
+    transition:color .5s;
+  }
+  h1 .redact:hover{color:var(--ink)}
+  .sub{font-size:12px;color:var(--paper-dim);margin-top:8px;line-height:1.7}
+
+  /* ドロップゾーン */
+  #dropzone{
+    border:1.5px dashed var(--line);border-radius:8px;
+    padding:52px 20px;text-align:center;cursor:pointer;
+    color:var(--paper-dim);font-size:14px;line-height:2;
+    transition:border-color .2s, background .2s;
+  }
+  #dropzone.dragover{border-color:var(--gold);background:var(--panel)}
+  #dropzone strong{color:var(--paper)}
+  #fileInput{display:none}
+
+  /* キャンバス */
+  #stage{display:none;margin-top:18px}
+  #canvasHolder{
+    position:relative;border:1px solid var(--line);border-radius:6px;
+    overflow:hidden;background:#000;line-height:0;
+  }
+  #canvasHolder canvas{width:100%;height:auto;display:block}
+  #overlay{position:absolute;left:0;top:0;pointer-events:none}
+  #canvasHolder.manual #overlay{pointer-events:auto;cursor:crosshair}
+
+  /* コントロール */
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:16px;margin-top:14px;
+  }
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .row + .row{margin-top:12px}
+  label.field{font-size:12px;color:var(--paper-dim);display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+  input[type=text]{
+    background:var(--panel2);border:1px solid var(--line);border-radius:5px;
+    color:var(--paper);padding:9px 10px;font-size:14px;width:100%;
+  }
+  input[type=text]:focus{outline:none;border-color:var(--gold)}
+  button{
+    background:var(--panel2);color:var(--paper);border:1px solid var(--line);
+    border-radius:5px;padding:9px 16px;font-size:13px;cursor:pointer;
+    transition:background .15s,border-color .15s;
+    font-family:inherit;
+  }
+  button:hover{border-color:var(--gold)}
+  button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  button.primary{background:var(--seal);border-color:var(--seal);color:#f2e9e2}
+  button.primary:hover{background:#c04a3e}
+  button:disabled{opacity:.4;cursor:default}
+  .toggle{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--paper-dim);cursor:pointer;user-select:none}
+  .toggle input{accent-color:var(--seal);width:15px;height:15px}
+  .swatches{display:flex;gap:6px;align-items:center}
+  .swatch{
+    width:30px;height:30px;border-radius:5px;border:2px solid var(--line);cursor:pointer;padding:0;
+  }
+  .swatch.white{background:#fff}
+  .swatch.black{background:#000}
+  .swatch.active{border-color:var(--gold)}
+  .hint{font-size:11.5px;color:var(--paper-dim);line-height:1.8}
+
+  /* ステータス */
+  #status{
+    margin-top:12px;font-size:13px;color:var(--paper-dim);
+    min-height:1.6em;line-height:1.6;
+  }
+  #status.busy::before{content:"◈ ";color:var(--gold)}
+  #status.ok::before{content:"◈ ";color:var(--seal)}
+  #status.err{color:#d08a80}
+
+  .divider{border:none;border-top:1px solid var(--line);margin:14px 0}
+  @media (max-width:520px){
+    body{padding:16px 10px 50px}
+    h1{font-size:21px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Riddle Manor — Redaction Room</div>
+    <h1>墨消しの間<span class="redact">SUMIKESHI</span></h1>
+    <div class="sub">画像のなかの言葉に、白か黒の墨を引いて封をする部屋。<br>スクリーンショットを持ち込んで、消したい単語を最大ふたつまで告げること。</div>
+  </header>
+
+  <div id="dropzone" tabindex="0" role="button" aria-label="画像を選択">
+    ここに画像をドロップ / クリックして選択<br>
+    <strong>Ctrl+V（⌘+V）での貼り付け</strong>にも応じます
+  </div>
+  <input type="file" id="fileInput" accept="image/*">
+
+  <div id="stage">
+    <div id="canvasHolder">
+      <canvas id="mainCanvas"></canvas>
+      <canvas id="overlay"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <label class="field">消したい単語 その一
+          <input type="text" id="word1" placeholder="例：夏樹">
+        </label>
+        <label class="field">消したい単語 その二（任意）
+          <input type="text" id="word2" placeholder="">
+        </label>
+      </div>
+      <div class="row">
+        <span class="hint">墨の色：</span>
+        <div class="swatches" role="radiogroup" aria-label="塗りつぶす色">
+          <button class="swatch black active" id="swBlack" aria-label="黒" title="黒"></button>
+          <button class="swatch white" id="swWhite" aria-label="白" title="白"></button>
+        </div>
+        <button class="primary" id="btnDetect">単語を探す</button>
+        <button id="btnApply" disabled>見つけた場所を塗る</button>
+      </div>
+      <hr class="divider">
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="manualMode">手動モード（ドラッグで矩形を塗る）</label>
+        <button id="btnUndo" disabled>ひとつ戻す</button>
+        <button id="btnSave">画像を保存</button>
+        <button id="btnReset">別の画像にする</button>
+      </div>
+      <div class="hint" style="margin-top:10px">
+        自動検出は文字認識（OCR）に頼るため、装飾的なフォントや小さな文字は取りこぼすことがあります。そのときは手動モードで直接墨を引いてください。
+      </div>
+    </div>
+
+    <div id="status"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const dropzone=$('dropzone'), fileInput=$('fileInput'), stage=$('stage'),
+        holder=$('canvasHolder'), main=$('mainCanvas'), overlay=$('overlay'),
+        status=$('status');
+  const ctx=main.getContext('2d'), octx=overlay.getContext('2d');
+  let fillColor='#000000';
+  let undoStack=[];          // ImageData の履歴（最大12）
+  let pendingHits=[];        // 検出済み・未塗りの矩形
+  let worker=null, workerReady=false, workerFailed=false;
+  let origName='image';
+
+  function setStatus(msg, cls){
+    status.textContent=msg||'';
+    status.className=cls||'';
+  }
+
+  /* ---------- 画像の読み込み ---------- */
+  function loadImageFile(file){
+    if(!file || !file.type.startsWith('image/')){ setStatus('画像ファイルではないようです。','err'); return; }
+    origName=(file.name||'image').replace(/\.[^.]+$/,'');
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      main.width=img.naturalWidth; main.height=img.naturalHeight;
+      overlay.width=img.naturalWidth; overlay.height=img.naturalHeight;
+      ctx.drawImage(img,0,0);
+      URL.revokeObjectURL(url);
+      undoStack=[]; pendingHits=[]; drawOverlay();
+      $('btnUndo').disabled=true; $('btnApply').disabled=true;
+      dropzone.style.display='none'; stage.style.display='block';
+      setStatus('画像を受け取りました。単語を告げるか、手動モードで墨を引いてください。','ok');
+    };
+    img.onerror=()=>setStatus('画像の読み込みに失敗しました。','err');
+    img.src=url;
+  }
+  dropzone.addEventListener('click',()=>fileInput.click());
+  dropzone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')fileInput.click();});
+  fileInput.addEventListener('change',e=>loadImageFile(e.target.files[0]));
+  ['dragover','dragenter'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.add('dragover');}));
+  ['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.remove('dragover');}));
+  dropzone.addEventListener('drop',e=>loadImageFile(e.dataTransfer.files[0]));
+  document.addEventListener('paste',e=>{
+    const items=e.clipboardData && e.clipboardData.items;
+    if(!items) return;
+    for(const it of items){
+      if(it.type.startsWith('image/')){ loadImageFile(it.getAsFile()); e.preventDefault(); return; }
+    }
+  });
+
+  /* ---------- 色選択 ---------- */
+  $('swBlack').addEventListener('click',()=>{fillColor='#000000';$('swBlack').classList.add('active');$('swWhite').classList.remove('active');});
+  $('swWhite').addEventListener('click',()=>{fillColor='#ffffff';$('swWhite').classList.add('active');$('swBlack').classList.remove('active');});
+
+  /* ---------- Undo ---------- */
+  function pushUndo(){
+    try{
+      undoStack.push(ctx.getImageData(0,0,main.width,main.height));
+      if(undoStack.length>12) undoStack.shift();
+      $('btnUndo').disabled=false;
+    }catch(e){/* 巨大画像でメモリ不足の場合は履歴なしで続行 */}
+  }
+  $('btnUndo').addEventListener('click',()=>{
+    const prev=undoStack.pop();
+    if(prev){ ctx.putImageData(prev,0,0); }
+    if(!undoStack.length) $('btnUndo').disabled=true;
+    setStatus('ひとつ前に戻しました。','ok');
+  });
+
+  /* ---------- OCR ---------- */
+  async function ensureWorker(){
+    if(workerReady) return true;
+    if(workerFailed) return false;
+    setStatus('文字認識エンジンを呼び起こしています…（初回は少し時間がかかります）','busy');
+    try{
+      worker=await Tesseract.createWorker(['jpn','eng'],1,{
+        logger:m=>{
+          if(m.status && typeof m.progress==='number'){
+            setStatus(`準備中… ${m.status} ${(m.progress*100|0)}%`,'busy');
+          }
+        }
+      });
+      workerReady=true;
+      return true;
+    }catch(e){
+      console.error(e);
+      workerFailed=true;
+      setStatus('文字認識エンジンの読み込みに失敗しました（通信制限の可能性）。手動モードをお使いください。','err');
+      return false;
+    }
+  }
+
+  function collectLines(data){
+    if(data.lines && data.lines.length) return data.lines;
+    const lines=[];
+    (data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>lines.push(l))));
+    return lines;
+  }
+
+  function findMatches(lines,targets){
+    const hits=[];
+    for(const line of lines){
+      const syms=[];
+      (line.words||[]).forEach(w=>(w.symbols||[]).forEach(s=>{ if(s.text) syms.push(s); }));
+      if(!syms.length) continue;
+      const joined=syms.map(s=>s.text).join('').toLowerCase();
+      for(const t of targets){
+        const needle=t.replace(/\s+/g,'').toLowerCase();
+        if(!needle) continue;
+        let idx=joined.indexOf(needle);
+        while(idx!==-1){
+          const seg=syms.slice(idx,idx+needle.length);
+          const x0=Math.min(...seg.map(s=>s.bbox.x0));
+          const y0=Math.min(...seg.map(s=>s.bbox.y0));
+          const x1=Math.max(...seg.map(s=>s.bbox.x1));
+          const y1=Math.max(...seg.map(s=>s.bbox.y1));
+          hits.push({x0,y0,x1,y1});
+          idx=joined.indexOf(needle,idx+needle.length);
+        }
+      }
+    }
+    return hits;
+  }
+
+  $('btnDetect').addEventListener('click',async ()=>{
+    const targets=[$('word1').value.trim(),$('word2').value.trim()].filter(Boolean);
+    if(!targets.length){ setStatus('消したい単語を少なくともひとつ入力してください。','err'); return; }
+    const ok=await ensureWorker();
+    if(!ok) return;
+    setStatus('画像を読み解いています…','busy');
+    $('btnDetect').disabled=true;
+    try{
+      const {data}=await worker.recognize(main);
+      const lines=collectLines(data);
+      pendingHits=findMatches(lines,targets);
+      drawOverlay();
+      if(pendingHits.length){
+        $('btnApply').disabled=false;
+        setStatus(`${pendingHits.length} 箇所を見つけました。朱の枠を確認して「見つけた場所を塗る」を。違う場所なら手動モードでどうぞ。`,'ok');
+      }else{
+        $('btnApply').disabled=true;
+        setStatus('該当する文字列が見つかりませんでした。表記ゆれ（全角/半角など）を試すか、手動モードをお使いください。','err');
+      }
+    }catch(e){
+      console.error(e);
+      setStatus('認識中にエラーが起きました。手動モードをお使いください。','err');
+    }finally{
+      $('btnDetect').disabled=false;
+    }
+  });
+
+  function drawOverlay(){
+    octx.clearRect(0,0,overlay.width,overlay.height);
+    octx.strokeStyle='#a83c32';
+    octx.lineWidth=Math.max(2, main.width/400);
+    for(const h of pendingHits){
+      const pad=3;
+      octx.strokeRect(h.x0-pad,h.y0-pad,(h.x1-h.x0)+pad*2,(h.y1-h.y0)+pad*2);
+    }
+  }
+
+  $('btnApply').addEventListener('click',()=>{
+    if(!pendingHits.length) return;
+    pushUndo();
+    ctx.fillStyle=fillColor;
+    for(const h of pendingHits){
+      const padX=Math.max(3,(h.y1-h.y0)*0.15), padY=Math.max(2,(h.y1-h.y0)*0.12);
+      ctx.fillRect(h.x0-padX,h.y0-padY,(h.x1-h.x0)+padX*2,(h.y1-h.y0)+padY*2);
+    }
+    const n=pendingHits.length;
+    pendingHits=[]; drawOverlay();
+    $('btnApply').disabled=true;
+    setStatus(`${n} 箇所に墨を引きました。やり直すなら「ひとつ戻す」。`,'ok');
+  });
+
+  /* ---------- 手動モード ---------- */
+  let drawing=false, sx=0, sy=0;
+  $('manualMode').addEventListener('change',e=>{
+    holder.classList.toggle('manual',e.target.checked);
+    if(e.target.checked) setStatus('手動モード：画像の上をドラッグすると、その矩形に墨が引かれます。','ok');
+  });
+  function canvasPos(e){
+    const r=overlay.getBoundingClientRect();
+    const cx=(e.clientX-r.left)/r.width*overlay.width;
+    const cy=(e.clientY-r.top)/r.height*overlay.height;
+    return [cx,cy];
+  }
+  overlay.addEventListener('pointerdown',e=>{
+    if(!$('manualMode').checked) return;
+    e.preventDefault();
+    overlay.setPointerCapture(e.pointerId);
+    [sx,sy]=canvasPos(e); drawing=true;
+  });
+  overlay.addEventListener('pointermove',e=>{
+    if(!drawing) return;
+    const [cx,cy]=canvasPos(e);
+    drawOverlay();
+    octx.fillStyle=fillColor==='#000000'?'rgba(0,0,0,.55)':'rgba(255,255,255,.6)';
+    octx.fillRect(Math.min(sx,cx),Math.min(sy,cy),Math.abs(cx-sx),Math.abs(cy-sy));
+  });
+  overlay.addEventListener('pointerup',e=>{
+    if(!drawing) return;
+    drawing=false;
+    const [cx,cy]=canvasPos(e);
+    const w=Math.abs(cx-sx), h=Math.abs(cy-sy);
+    drawOverlay();
+    if(w<3||h<3) return;
+    pushUndo();
+    ctx.fillStyle=fillColor;
+    ctx.fillRect(Math.min(sx,cx),Math.min(sy,cy),w,h);
+    setStatus('墨を引きました。','ok');
+  });
+
+  /* ---------- 保存・リセット ---------- */
+  $('btnSave').addEventListener('click',()=>{
+    main.toBlob(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=origName+'_redacted.png';
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+      setStatus('封をした画像を書き出しました。','ok');
+    },'image/png');
+  });
+  $('btnReset').addEventListener('click',()=>{
+    stage.style.display='none';
+    dropzone.style.display='block';
+    undoStack=[]; pendingHits=[];
+    setStatus('');
+  });
+})();
+</script>
+</body>
+</html>
