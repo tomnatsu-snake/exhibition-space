@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebP変換プラグイン（Obsidian用）｜なつきのおもちゃ箱🐍</title>
+<meta name="description" content="Obsidianに画像を入れると自動でWebPに変換して軽くするプラグイン。既存画像の一括変換にも対応。">
+<style>
+  :root{
+    --ink:#22301f;
+    --paper:#f3efe4;
+    --card:#faf7ee;
+    --moss:#3d5a3a;
+    --moss-deep:#2c4229;
+    --gold:#b08d3f;
+    --line:#d8d2be;
+    --soft:#6b7a63;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+    background:var(--paper);
+    background-image:radial-gradient(circle at 20% 10%, rgba(176,141,63,.06), transparent 40%);
+    color:var(--ink);
+    line-height:1.9;
+    padding:2.5rem 1.2rem 4rem;
+  }
+  .wrap{max-width:640px;margin:0 auto}
+  .eyebrow{
+    font-size:.78rem;letter-spacing:.22em;color:var(--soft);
+    text-align:center;margin-bottom:.6rem;
+  }
+  h1{
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    font-size:1.7rem;font-weight:600;text-align:center;
+    letter-spacing:.06em;color:var(--moss-deep);
+  }
+  .tagline{text-align:center;color:var(--soft);font-size:.92rem;margin-top:.5rem}
+  .divider{
+    display:flex;align-items:center;gap:.8rem;margin:2rem 0 1.6rem;
+    color:var(--gold);font-size:.8rem;
+  }
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  /* 圧縮の実例 */
+  .weights{
+    display:flex;align-items:flex-end;justify-content:center;gap:1.6rem;
+    margin:1.8rem 0 .4rem;
+  }
+  .weight{text-align:center}
+  .weight .bar{
+    width:64px;margin:0 auto .5rem;border-radius:6px 6px 2px 2px;
+    background:linear-gradient(180deg,var(--moss),var(--moss-deep));
+  }
+  .weight.before .bar{height:120px;opacity:.35}
+  .weight.after  .bar{height:14px}
+  .weight .num{font-family:Georgia,serif;font-size:1.05rem;color:var(--moss-deep)}
+  .weight .label{font-size:.75rem;color:var(--soft);letter-spacing:.1em}
+  .arrow{align-self:center;color:var(--gold);font-size:1.2rem;padding-bottom:2rem}
+  .weights-note{text-align:center;font-size:.8rem;color:var(--soft)}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:1.6rem 1.5rem;margin-top:1.6rem;
+    box-shadow:0 2px 10px rgba(44,66,41,.05);
+  }
+  .card h2{
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    font-size:1.05rem;color:var(--moss-deep);letter-spacing:.08em;
+    margin-bottom:.8rem;
+  }
+  .card p{font-size:.92rem;margin-bottom:.6rem}
+  ul.features{list-style:none;font-size:.92rem}
+  ul.features li{padding-left:1.3em;position:relative;margin-bottom:.45em}
+  ul.features li::before{content:"❦";position:absolute;left:0;color:var(--gold);font-size:.85em}
+
+  /* DLボタン */
+  .dl-area{text-align:center;margin:2.2rem 0 .6rem}
+  #dlbtn{
+    font-family:inherit;cursor:pointer;
+    background:linear-gradient(180deg,var(--moss),var(--moss-deep));
+    color:#f5f2e6;border:none;border-radius:999px;
+    font-size:1.02rem;letter-spacing:.08em;
+    padding:1rem 2.6rem;
+    box-shadow:0 4px 14px rgba(44,66,41,.28);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  #dlbtn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(44,66,41,.34)}
+  #dlbtn:active{transform:translateY(0)}
+  #dlbtn:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+  .dl-meta{font-size:.78rem;color:var(--soft);margin-top:.7rem}
+  #dlmsg{font-size:.85rem;color:var(--moss);margin-top:.5rem;min-height:1.4em}
+
+  ol.steps{counter-reset:step;list-style:none;font-size:.92rem}
+  ol.steps li{
+    counter-increment:step;position:relative;
+    padding:.55em 0 .55em 2.4em;border-bottom:1px dashed var(--line);
+  }
+  ol.steps li:last-child{border-bottom:none}
+  ol.steps li::before{
+    content:counter(step);
+    position:absolute;left:0;top:.65em;
+    width:1.6em;height:1.6em;border-radius:50%;
+    background:var(--moss);color:#f5f2e6;
+    font-size:.78em;display:flex;align-items:center;justify-content:center;
+  }
+  code{
+    background:rgba(61,90,58,.09);border-radius:4px;
+    padding:.1em .4em;font-size:.88em;
+    font-family:Menlo,Consolas,monospace;color:var(--moss-deep);
+  }
+  .note{font-size:.82rem;color:var(--soft);margin-top:.8rem}
+  footer{
+    text-align:center;margin-top:3rem;font-size:.78rem;color:var(--soft);
+  }
+  footer a{color:var(--moss);text-decoration:none;border-bottom:1px solid var(--line)}
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important}
+    html{scroll-behavior:auto}
+  }
+  @media (max-width:420px){
+    h1{font-size:1.45rem}
+    .weight.before .bar{height:96px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">OBSIDIAN PLUGIN</p>
+  <h1>WebP変換プラグイン</h1>
+  <p class="tagline">画像を入れるだけで、勝手に軽くなる小さな道具</p>
+
+  <div class="weights" aria-hidden="true">
+    <div class="weight before">
+      <div class="bar"></div>
+      <div class="num">99&thinsp;MB</div>
+      <div class="label">BEFORE</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="weight after">
+      <div class="bar"></div>
+      <div class="num">7.7&thinsp;MB</div>
+      <div class="label">AFTER</div>
+    </div>
+  </div>
+  <p class="weights-note">実測：わたしの保管庫の画像129枚がここまで痩せました（見た目はほぼそのまま）</p>
+
+  <div class="dl-area">
+    <button id="dlbtn" type="button">プラグインをお持ち帰り（zip）</button>
+    <p class="dl-meta">webp-drop-converter.zip ／ 約5KB ／ v1.1.1</p>
+    <p id="dlmsg" role="status"></p>
+  </div>
+
+  <div class="card">
+    <h2>なにをしてくれるの？</h2>
+    <ul class="features">
+      <li>ノートに画像をドラッグ＆ドロップ／ペーストすると、自動でWebP形式に変換して保存</li>
+      <li>変換のたびに「850KB → 120KB（-86%）」みたいな成績を通知でお知らせ</li>
+      <li>コマンドパレットから、保管庫にすでにある画像の一括変換もできます（リンクは自動で書き換え）</li>
+      <li>設定で画質（おすすめ0.8）と最大サイズを調整可能。GIFとSVGはそっとしておきます</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>導入の仕方</h2>
+    <ol class="steps">
+      <li>上のボタンでzipをダウンロードして解凍する</li>
+      <li>Obsidianの保管庫（Vault）フォルダの中の <code>.obsidian/plugins/</code> を開く<br>
+        <span class="note">※ <code>.obsidian</code> は隠しフォルダ。Macなら <code>Cmd+Shift+.</code> で表示、<code>plugins</code> がなければ作ってOK</span></li>
+      <li>解凍した <code>webp-drop-converter</code> フォルダをまるごとそこに置く</li>
+      <li>Obsidianの設定 →「コミュニティプラグイン」を開き、制限モードがオンなら一度オフにする</li>
+      <li>一覧に出てくる「WebP Drop Converter」をオンにする（出なければObsidianを再起動）</li>
+    </ol>
+    <p class="note">一括変換を使うときは、念のため保管庫フォルダをコピーしてバックアップしてからどうぞ。</p>
+  </div>
+
+  <footer>
+    ❦ ©Natsuki　このページの処理はすべてブラウザ内で完結し、データが保存・送信されることはありません。<br>
+    <a href="https://tomnatsu-snake.github.io/exhibition-space/">← おもちゃ箱にもどる</a>
+  </footer>
+</div>
+
+<script>
+(function(){
+  // zip本体（base64で内蔵）
+  const ZIP_B64 = "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";
+
+  document.getElementById("dlbtn").addEventListener("click", function(){
+    try{
+      const bin = atob(ZIP_B64);
+      const bytes = new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], {type:"application/zip"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "webp-drop-converter.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 3000);
+      document.getElementById("dlmsg").textContent = "お持ち帰りどうぞ〜！　解凍して手順のとおりに置いてね";
+    }catch(e){
+      document.getElementById("dlmsg").textContent = "ダウンロードに失敗しました。ページを再読み込みして試してみてください";
+      console.error(e);
+    }
+  });
+})();
+</script>
+</body>
+</html>
